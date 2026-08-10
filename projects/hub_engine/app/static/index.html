@@ -506,15 +506,32 @@
             appendLoading(loadingId);
 
             try {
+                // Récupérer la clé d'API du localStorage ou utiliser la clé par défaut
+                let apiKey = localStorage.getItem('hub_api_key') || 'super-secret-hub-key-change-me';
+
                 // Call API backend
                 const response = await fetch('/api/v1/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-API-Key': 'super-secret-hub-key-change-me' // A adapter si modifiée
+                        'X-API-Key': apiKey
                     },
                     body: JSON.stringify({ message: text })
                 });
+                
+                // Si non autorisé (401), demander la clé à l'utilisateur
+                if (response.status === 401) {
+                    document.getElementById(loadingId).remove();
+                    const newKey = prompt("Clé d'API incorrecte ou absente. Veuillez entrer la valeur de API_KEY configurée dans votre fichier .env :");
+                    if (newKey) {
+                        localStorage.setItem('hub_api_key', newKey.trim());
+                        userInput.value = text; // Remettre le texte pour ré-envoi rapide
+                        appendMessage("🔑 Clé d'API mise à jour. Tu peux renvoyer ton message !", 'assistant', formatTime(new Date()));
+                    } else {
+                        appendMessage("⚠️ Requête non autorisée (401). Renseigne ta clé API_KEY pour continuer.", 'assistant', formatTime(new Date()));
+                    }
+                    return;
+                }
                 
                 const data = await response.json();
                 
@@ -527,7 +544,9 @@
                     appendMessage("⚠️ Une erreur est survenue lors de la communication avec l'agent.", 'assistant', formatTime(new Date()));
                 }
             } catch (e) {
-                document.getElementById(loadingId).remove();
+                if (document.getElementById(loadingId)) {
+                    document.getElementById(loadingId).remove();
+                }
                 appendMessage("❌ Erreur de connexion avec le serveur backend.", 'assistant', formatTime(new Date()));
             }
         }
