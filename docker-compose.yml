@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  hub_engine:
+    build:
+      context: ./projects/hub_engine
+      dockerfile: Dockerfile
+    container_name: hub_engine
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - hub_data:/app/data
+      # Montage des docs pour que le conteneur lise les préférences Markdown locales
+      - ./docs:/docs
+    environment:
+      - DATABASE_URL=sqlite:////app/data/hub.db
+      - DOCS_DIR=/docs
+      - API_KEY=${API_KEY:-super-secret-hub-key-change-me}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    env_file:
+      - .env
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n_app
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      # Base SQLite interne pour n8n
+      - N8N_DATABASE_TYPE=sqlite
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-random-key-change-me}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    env_file:
+      - .env
+
+volumes:
+  hub_data:
+    driver: local
+  n8n_data:
+    driver: local
