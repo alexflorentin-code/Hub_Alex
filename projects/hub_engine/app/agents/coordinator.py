@@ -43,7 +43,7 @@ def get_coordinator_agent() -> Agent:
     
     agent = Agent(
         model=model_name,
-        result_type=CoordinatorResponse,
+        output_type=CoordinatorResponse,
         system_prompt=system_prompt
     )
     return agent
@@ -61,4 +61,4 @@ async def run_coordinator(user_query: str) -> CoordinatorResponse:
         )
     
     result = await agent.run(user_query)
-    return result.data
+    return result.output
