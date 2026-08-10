@@ -13,6 +13,8 @@ services:
       - hub_data:/app/data
       # Montage des docs pour que le conteneur lise les préférences Markdown locales
       - ./docs:/docs
+      # Montage du code source pour le développement et l'exécution des tests à chaud
+      - ./projects/hub_engine:/app
     environment:
       - DATABASE_URL=sqlite:////app/data/hub.db
       - DOCS_DIR=/docs
