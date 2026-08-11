@@ -51,7 +51,7 @@ def get_coordinator_agent() -> Agent:
 async def run_coordinator(user_query: str) -> CoordinatorResponse:
     agent = get_coordinator_agent()
     # Si nous sommes en mode test
-    if agent.model == "test":
+    if resolve_model() == "test":
         return CoordinatorResponse(
             status="success",
             summary="Hub opérationnel en mode test",
