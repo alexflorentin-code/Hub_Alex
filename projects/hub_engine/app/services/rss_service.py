@@ -26,7 +26,7 @@ DEFAULT_SOURCES = [
     ("Hugging Face Blog", "https://huggingface.co/blog/feed.xml"),
     ("Anthropic Engineering", "https://conoro.github.io/anthropic-engineering-rss-feed/anthropic_engineering_rss.xml"),
     # GitHub & Outils
-    ("GitHub Trending Python", "https://github-trending-rss.deno.dev/daily?lang=python"),
+    ("GitHub AI Trending", "https://hnrss.org/newest?q=github.com+AND+(LLM+OR+AI+OR+agent)&points=20"),
     ("Simon Willison Weblog", "https://simonwillison.net/atom/entries/"),
     ("Reddit r/LocalLLaMA", "https://www.reddit.com/r/LocalLLaMA/.rss"),
     # Buzz & Débats

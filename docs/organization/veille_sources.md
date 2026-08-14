@@ -14,7 +14,7 @@ Ce fichier contient la liste des flux RSS/Atom surveillés par l'**Agent de Veil
 ---
 
 ## 2. GitHub Trending & Nouveaux Outils Open-Source
-* **GitHub Trending Python (Dépôts IA / Dev)** : `https://github-trending-rss.deno.dev/daily?lang=python`
+* **GitHub Trending AI (Dépôts IA / Devs)** : `https://hnrss.org/newest?q=github.com+AND+(LLM+OR+AI+OR+agent)&points=20`
 * **Simon Willison's Weblog (Ingénierie LLM, Outils & Agents)** : `https://simonwillison.net/atom/entries/`
 * **Reddit r/LocalLLaMA (Inférence locale, Ollama, vLLM, quant)** : `https://www.reddit.com/r/LocalLLaMA/.rss`
 

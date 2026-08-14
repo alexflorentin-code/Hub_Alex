@@ -1,4 +1,5 @@
 import os
+import asyncio
 import logging
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -23,47 +24,38 @@ class VeilleDigest(BaseModel):
     telegram_formatted_message: str = Field(description="Message complet formaté en Markdown pour Telegram avec émojis et liens [Titre](url)")
     email_formatted_digest: str = Field(description="Version longue type Newsletter formatée avec titre, sections et liens pour envoi par e-mail")
 
-def resolve_model():
-    """Détermine le modèle LLM à utiliser (Gemini, OpenAI ou TestModel)."""
-    if settings.GEMINI_API_KEY:
-        os.environ["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
-        return "gemini-2.5-flash"
-    elif settings.OPENAI_API_KEY:
-        os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
-        return "openai:gpt-4o-mini"
-    else:
-        return "test"
+GEMINI_CANDIDATE_MODELS = [
+    "google:gemini-3.6-flash",
+    "google:gemini-3.7-flash",
+    "google:gemini-3.5-flash",
+    "google:gemini-flash-latest",
+    "google:gemini-2.5-flash"
+]
 
-def get_veille_agent() -> Agent:
-    model_name = resolve_model()
-    system_prompt = """
-    Tu es l'Agent de Veille Technologique et IA de Hub_Alex.
-    Ton rôle est d'analyser un flux d'actualités brutes issues des meilleurs blogs (OpenAI, DeepMind, Anthropic, Hugging Face, Simon Willison, Reddit LocalLLaMA, GitHub Trending, Hacker News, Techmeme).
+SYSTEM_PROMPT = """
+Tu es l'Agent de Veille Technologique et IA de Hub_Alex pour Alexandre.
+Ton rôle est d'analyser un flux d'actualités brutes issues des meilleurs blogs (OpenAI, DeepMind, Anthropic, Hugging Face, Simon Willison, Reddit LocalLLaMA, GitHub Trending, Hacker News, Techmeme).
 
-    Tes objectifs :
-    1. Prendre de la hauteur et identifier la "Grande Tendance de Fond" de la semaine (ce qui structure le paysage IA en ce moment).
-    2. Sélectionner les 4 à 8 actualités les plus percutantes en éliminant tout bruit publicitaire.
-    3. Mettre en valeur :
-       - Les Nouveaux Modèles (benchmarks, open-weight vs API).
-       - Les Nouveaux Outils & Dépôts GitHub Trending (utilité pratique pour un dev).
-       - Les Débats Chauds & Buzz de la communauté.
-    4. TOUJOURS inclure le lien source cliquable au format Markdown [Nom](url) pour chaque point.
-    5. Rédiger deux formats de restitution :
-       - `telegram_formatted_message` : percutant, concis, aéré avec émojis, parfait pour lecture mobile rapide.
-       - `email_formatted_digest` : complet, rédigé avec style sous forme de Newsletter professionnelle.
-    """
-    return Agent(
-        model=model_name,
-        output_type=VeilleDigest,
-        system_prompt=system_prompt
-    )
+Tes objectifs :
+1. Prendre de la hauteur et identifier la "Grande Tendance de Fond" de la semaine (ce qui structure le paysage IA en ce moment).
+2. Sélectionner les 4 à 8 actualités les plus percutantes en éliminant tout bruit publicitaire.
+3. Mettre en valeur :
+   - Les Nouveaux Modèles (benchmarks, open-weight vs API).
+   - Les Nouveaux Outils & Dépôts GitHub Trending (utilité pratique pour un dev).
+   - Les Débats Chauds & Buzz de la communauté.
+4. TOUJOURS inclure le lien source cliquable au format Markdown [Nom](url) pour chaque point.
+5. Rédiger deux formats de restitution :
+   - `telegram_formatted_message` : percutant, concis, aéré avec émojis, parfait pour lecture mobile rapide.
+   - `email_formatted_digest` : complet, rédigé avec style sous forme de Newsletter professionnelle.
+"""
 
 async def run_veille_analysis(custom_prompt: Optional[str] = None) -> VeilleDigest:
-    """Exécute la collecte des flux et l'analyse intelligente par l'agent."""
+    """Exécute la collecte des flux et l'analyse intelligente avec cascade de secours."""
     logger.info("Lancement de l'analyse de veille...")
     items = await fetch_all_veille_items()
 
-    if resolve_model() == "test":
+    # Si aucune clé API n'est configurée (mode test unitaire)
+    if not settings.GEMINI_API_KEY and not settings.OPENAI_API_KEY:
         return VeilleDigest(
             status="success",
             macro_trend="L'essor des modèles de raisonnement et l'accélération des agents légers en local.",
@@ -95,9 +87,31 @@ async def run_veille_analysis(custom_prompt: Optional[str] = None) -> VeilleDige
         )
     
     context_str = "\n---\n".join(articles_context)
-    user_instruction = custom_prompt or "Analyse ces actualités récentes et génère le rapport de veille structuré avec les tendances et les liens sources."
+    user_instruction = custom_prompt or "Analyse ces actualités récentes et génère le rapport de veille structuré avec les tendances et les liens sources cliquables."
     full_prompt = f"Voici les articles récents collectés :\n\n{context_str}\n\nConsigne : {user_instruction}"
 
-    agent = get_veille_agent()
-    result = await agent.run(full_prompt)
-    return result.output
+    # Si OpenAI est configuré
+    if settings.OPENAI_API_KEY:
+        os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
+        agent = Agent("openai:gpt-4o-mini", output_type=VeilleDigest, system_prompt=SYSTEM_PROMPT)
+        result = await agent.run(full_prompt)
+        return result.output
+
+    # Cascade multi-modèles Gemini pour résilience 100%
+    if settings.GEMINI_API_KEY:
+        os.environ["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
+        last_error = None
+        for model_candidate in GEMINI_CANDIDATE_MODELS:
+            for attempt in range(2):
+                try:
+                    logger.info(f"Tentative d'analyse de veille avec {model_candidate} (essai {attempt+1})...")
+                    agent = Agent(model_candidate, output_type=VeilleDigest, system_prompt=SYSTEM_PROMPT)
+                    result = await agent.run(full_prompt)
+                    return result.output
+                except Exception as e:
+                    last_error = e
+                    logger.warning(f"Modèle {model_candidate} indisponible ({str(e)[:100]}). Bascule vers le modèle suivant...")
+                    await asyncio.sleep(1.0)
+        
+        logger.error(f"Tous les modèles Gemini ont échoué : {str(last_error)}")
+        raise last_error
