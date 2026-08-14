@@ -2,7 +2,7 @@ import os
 import secrets
 import logging
 from typing import Optional
-from fastapi import FastAPI, Depends, Header, HTTPException, status, Request
+from fastapi import FastAPI, Depends, Header, HTTPException, status, Request, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -12,15 +12,16 @@ from google.auth.transport import requests as google_requests
 
 from app.core.config import settings
 from app.agents.coordinator import run_coordinator
+from app.agents.veille import run_veille_analysis, VeilleDigest
 
 # Configuration des logs (capturés nativement par Google Cloud Logging)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("hub_engine")
 
 app = FastAPI(
-    title="Hub_Alex Engine (GCP Native with Google Auth)",
-    description="Backend API serverless et agents d'organisation avec Google Sign-In.",
-    version="0.3.0"
+    title="Hub_Alex Engine (GCP Native with Google Auth & Agent Veille)",
+    description="Backend API serverless, agents d'organisation et veille technologique.",
+    version="0.4.0"
 )
 
 # Modèles Pydantic
@@ -55,7 +56,6 @@ def verify_access(
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split("Bearer ")[1].strip()
         try:
-            # Vérification cryptographique du jeton auprès des serveurs de Google
             id_info = id_token.verify_oauth2_token(
                 token, 
                 google_requests.Request(), 
@@ -64,7 +64,6 @@ def verify_access(
             email = id_info.get("email")
             email_verified = id_info.get("email_verified", False)
             
-            # Vérification de l'adresse email autorisée
             if email_verified and email.lower() == settings.ALLOWED_GOOGLE_EMAIL.lower():
                 return {"auth_type": "google", "email": email, "name": id_info.get("name")}
             else:
@@ -151,13 +150,36 @@ async def chat_endpoint(request: ChatRequest, user_auth: dict = Depends(verify_a
     """Point d'entrée principal pour chatter avec le Coordinateur."""
     logger.info(f"Requête de chat reçue de [{user_auth.get('email') or user_auth.get('user')}] : {request.message[:50]}...")
     agent_response = await run_coordinator(request.message)
-    logger.info(f"Réponse de l'agent ({agent_response.status}) : {agent_response.summary}")
     
     return ChatResponse(
         response=agent_response.detailed_response,
         status=agent_response.status,
         summary=agent_response.summary
     )
+
+@app.post("/api/v1/veille/run", response_model=VeilleDigest)
+async def trigger_veille(
+    send_telegram: bool = Query(True, description="Envoyer la synthèse sur Telegram si activé"),
+    user_auth: dict = Depends(verify_access)
+):
+    """Exécute l'analyse de veille complète (RSS + PydanticAI)."""
+    logger.info("Exécution de l'Agent de Veille via l'API...")
+    digest = await run_veille_analysis()
+
+    if send_telegram and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
+        telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
+            "text": digest.telegram_formatted_message,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
+        }
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(telegram_url, json=payload)
+            if resp.status_code != 200:
+                logger.error(f"Erreur d'envoi Telegram pour la veille : {resp.text}")
+
+    return digest
 
 @app.post("/api/v1/briefing")
 async def trigger_briefing(user_auth: dict = Depends(verify_access)):
@@ -166,13 +188,13 @@ async def trigger_briefing(user_auth: dict = Depends(verify_access)):
     prompt = "Génère mon briefing matinal complet pour aujourd'hui : priorité des tâches, veille et agenda."
     agent_response = await run_coordinator(prompt)
     
-    # Si Telegram est configuré, envoyer directement le briefing sur le téléphone
     if settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
         telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
         payload = {
             "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
             "text": f"🌅 *Briefing Quotidien Hub_Alex*\n\n{agent_response.detailed_response}",
-            "parse_mode": "Markdown"
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
         }
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(telegram_url, json=payload)
@@ -195,7 +217,6 @@ async def telegram_webhook(request: Request):
     except Exception:
         return JSONResponse({"status": "invalid json"}, status_code=400)
 
-    # Récupérer le message et l'expéditeur
     message = update.get("message") or update.get("edited_message")
     if not message:
         return {"status": "ignored"}
@@ -215,11 +236,24 @@ async def telegram_webhook(request: Request):
 
     logger.info(f"Message Telegram reçu de l'utilisateur {sender_id} : {text}")
 
-    # Gérer les commandes de base
+    # GESTION DES COMMANDES SPÉCIALISÉES
     if text == "/start":
-        reply_text = "👋 Bonjour Alexandre ! Je suis ton Coordinateur Hub_Alex sur Cloud Run. Que puis-je faire pour toi ?"
+        reply_text = (
+            "👋 **Bonjour Alexandre !** Je suis ton Coordinateur Hub_Alex.\n\n"
+            "Commandes disponibles :\n"
+            "• `/news_ia` : Lancer la veille IA, nouveaux modèles et top GitHub.\n"
+            "• `/briefing` : Recevoir ton briefing du jour.\n"
+            "• Tu peux aussi simplement me poser une question ou me demander une tâche !"
+        )
+    elif text.lower() in ["/news_ia", "/news-ia", "/newsia", "/veille"]:
+        logger.info("Commande de veille reçue via Telegram (/news_ia)...")
+        veille_digest = await run_veille_analysis()
+        reply_text = veille_digest.telegram_formatted_message
+    elif text == "/briefing":
+        agent_response = await run_coordinator("Génère mon briefing matinal complet.")
+        reply_text = f"🌅 *Briefing Hub_Alex*\n\n{agent_response.detailed_response}"
     else:
-        # Exécuter l'Agent Coordinateur
+        # Exécuter l'Agent Coordinateur normal
         agent_response = await run_coordinator(text)
         reply_text = agent_response.detailed_response
 
@@ -229,14 +263,14 @@ async def telegram_webhook(request: Request):
         payload = {
             "chat_id": chat_id,
             "text": reply_text,
-            "parse_mode": "Markdown"
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=35.0) as client:
             try:
                 resp = await client.post(telegram_url, json=payload)
                 if resp.status_code != 200:
-                    # Si le parsing Markdown échoue (caractères spéciaux), renvoyer en texte brut
-                    payload.pop("parse_mode")
+                    payload.pop("parse_mode", None)
                     await client.post(telegram_url, json=payload)
             except Exception as e:
                 logger.error(f"Erreur lors de l'envoi de la réponse Telegram : {str(e)}")
@@ -251,7 +285,7 @@ if os.path.exists(static_dir):
 
 @app.get("/")
 def serve_index():
-    """Sert l'interface Web (la vérification Google Sign-In est gérée côté client et API)."""
+    """Sert l'interface Web."""
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)

@@ -1,8 +1,10 @@
 import os
+import re
 from pydantic_ai import Agent
 from pydantic import BaseModel, Field
 from .helpers import get_global_agent_context
 from app.core.config import settings
+from .veille import run_veille_analysis
 
 # Modèle de réponse structurée pour le coordinateur
 class CoordinatorResponse(BaseModel):
@@ -49,8 +51,23 @@ def get_coordinator_agent() -> Agent:
     return agent
 
 async def run_coordinator(user_query: str) -> CoordinatorResponse:
+    # 1. Détection des demandes de veille technologique & IA
+    veille_keywords = ["veille", "news_ia", "news-ia", "news ia", "actualité", "tendance", "nouveauté", "ia"]
+    query_lower = user_query.lower()
+    
+    # Si la requête porte explicitement sur la veille ou les tendances IA
+    if any(k in query_lower for k in ["veille", "news_ia", "news-ia", "tendance ia", "actualités ia", "actualite ia"]):
+        veille_digest = await run_veille_analysis(user_query)
+        return CoordinatorResponse(
+            status="success",
+            summary=f"Synthèse Veille IA : {veille_digest.macro_trend[:80]}...",
+            detailed_response=veille_digest.telegram_formatted_message,
+            action_taken="Collecte RSS et analyse des tendances IA via l'Agent de Veille.",
+            next_steps=["Consulter les sources en lien", "Demander un format email / newsletter si souhaité"]
+        )
+
+    # 2. Exécution normale du coordinateur
     agent = get_coordinator_agent()
-    # Si nous sommes en mode test
     if resolve_model() == "test":
         return CoordinatorResponse(
             status="success",
