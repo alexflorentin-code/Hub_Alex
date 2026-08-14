@@ -1,24 +1,39 @@
-# Walkthrough — Authentification Google Sign-In & Sécurité Maximale
+# Walkthrough — Phase 1 : Agent de Veille Technologique & IA
 
-L'authentification **Google Sign-In (OAuth 2.0)** a été intégrée avec succès au frontend et au backend de **Hub_Alex**, testée à 100% et poussée sur votre dépôt GitHub : [https://github.com/alexflorentin-code/Hub_Alex](https://github.com/alexflorentin-code/Hub_Alex).
+L'**Agent de Veille IA** (Phase 1) est désormais entièrement développé, validé par **14 tests unitaires (100% de réussite)** et déployé sur **Google Cloud Run** via GitHub Actions.
 
 ---
 
-## 🔐 Ce qui a été implémenté
+## 🌟 Ce qui a été développé
 
-1. **Frontend Web ([index.html](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/static/index.html))** :
-   * Intégration du composant officiel **Google Identity Services**.
-   * Bouton moderne « Se connecter avec Google ».
-   * Affichage de votre avatar et de votre adresse e-mail Google dans la barre latérale une fois connecté.
-   * Bouton de Déconnexion sécurisé (Logout).
-2. **Backend API ([main.py](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/main.py))** :
-   * Endpoint de validation du jeton Google : `POST /api/v1/auth/google`.
-   * Dépendance de sécurité `verify_access` qui valide cryptographiquement la signature du jeton auprès de Google et s'assure que `email == alex.florentin@gmail.com`.
-   * Rejet immédiat (HTTP 403 Forbidden) pour tout autre compte Google tiers.
-3. **Tests Unitaires (9/9 Validés)** :
-   ```text
-   tests/test_main.py ......... [100%]
-   ============================== 9 passed in 0.72s ===============================
-   ```
-4. **Documentation & Guide Pas-à-Pas** :
-   * Le guide [docs/process_guides/gcp_and_telegram_setup.md](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/docs/process_guides/gcp_and_telegram_setup.md) a été enrichi avec la section **2.4 Créer l'identifiant Google Sign-In (OAuth 2.0 Client ID)**.
+### 1. Sourcing & Flux Curatés ([veille_sources.md](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/docs/organization/veille_sources.md))
+Surveillance automatique des 4 piliers d'excellence IA :
+* **Nouveaux Modèles & Frontier Labs** : OpenAI News, Google DeepMind / AI Blog, Hugging Face Blog, Anthropic Engineering.
+* **Top Dépôts GitHub & Outils Développeur** : GitHub Trending Python/IA, Simon Willison Weblog, Reddit r/LocalLLaMA.
+* **Débats & Buzz Communautaire** : Hacker News (Score > 50 pts), Techmeme.
+* **Business & Startups** : VentureBeat AI.
+
+### 2. Moteur Asynchrone & Parsing RSS ([rss_service.py](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/services/rss_service.py))
+* Téléchargement parallèle haute performance via `httpx.AsyncClient`.
+* Nettoyage du HTML des articles avec `BeautifulSoup`.
+* Dé-duplication automatique des liens et limitation aux articles les plus frais.
+
+### 3. Agent PydanticAI & Double Restitution ([veille.py](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/agents/veille.py))
+* **Analyse de la Grande Tendance de Fond Hebdomadaire** : Prise de recul sur les mouvements macro.
+* **Format Mobile Telegram** (`telegram_formatted_message`) : Condensé percutant avec émojis et liens sources cliquables `[Nom](url)`.
+* **Format Email Newsletter** (`email_formatted_digest`) : Digest complet structuré prêt à être envoyé par e-mail ou archivé.
+
+### 4. Commandes Telegram & API ([main.py](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/main.py))
+* Commande **`/news_ia`** (ou `/news-ia`) disponible directement dans votre chat Telegram.
+* Endpoint `POST /api/v1/veille/run` pour déclenchement programmatique ou via Cloud Scheduler.
+* Le Coordinateur répond aussi aux requêtes naturelles du type *« Fais-moi le point sur les actualités IA »*.
+
+---
+
+## 🧪 Validation des Tests (14/14 Passed)
+
+```text
+tests/test_main.py .........                                             [ 64%]
+tests/test_veille.py .....                                               [100%]
+======================= 14 passed in 7.11s ========================
+```
