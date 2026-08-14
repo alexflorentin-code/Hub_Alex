@@ -1,0 +1,50 @@
+name: Déploiement Continu sur Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: europe-west1
+  GAR_REPOSITORY: hub-alex-repo
+  SERVICE_NAME: hub-alex
+  IMAGE_NAME: hub-engine
+
+jobs:
+  deploy:
+    name: Build & Deploy to Cloud Run
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Récupération du code
+        uses: actions/checkout@v4
+
+      - name: 2. Authentification Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 3. Configuration du CLI gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 4. Configuration de Docker pour Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: 5. Construction et Push de l'image Docker
+        run: |
+          IMAGE_TAG="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          docker build -t "$IMAGE_TAG" -f projects/hub_engine/Dockerfile projects/hub_engine
+          docker push "$IMAGE_TAG"
+          echo "DEPLOYED_IMAGE=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: 6. Déploiement sur Google Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.DEPLOYED_IMAGE }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "API_KEY=${{ secrets.HUB_API_KEY }},BASIC_AUTH_USERNAME=${{ secrets.BASIC_AUTH_USERNAME }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }},ALLOWED_TELEGRAM_USER_ID=${{ secrets.ALLOWED_TELEGRAM_USER_ID }}"

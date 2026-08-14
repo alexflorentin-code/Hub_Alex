@@ -1,31 +1,50 @@
-# Hub_Alex (Control Center personnel)
+# Hub_Alex (Control Center Personnel — GCP Native)
 
-Ce projet est votre **Control Center personnel** structuré selon une architecture **Hub-and-Spoke** (Monorepo) simplifiée, combinant la puissance locale d'Antigravity et l'autonomie d'un assistant disponible 24h/24 dans le cloud.
+Bienvenue dans votre **Control Center personnel**, une plateforme d'automatisation et d'organisation personnelle 100% Serverless déployée sur **Google Cloud Platform (GCP)** pour **0 CHF / mois** (Free Tier).
 
 ---
 
 ## 1. Fonctionnement Global
 
+```text
+  [ Telegram App ] ------------(Webhook HTTPS Direct)------------> [ Cloud Run : hub_engine ]
+                                                                          |
+  [ Cloud Scheduler ] --(Requête HTTP 7h00 du matin)--------------------->| (FastAPI + PydanticAI)
+                                                                          |
+  [ Mémoire & Préférences ] <---(Stockage Git / Markdown)-----------------+
+```
+
 ### 1.1 L'Orchestration locale (IDE)
-* **L'Agent Coordinateur** (`.agents/rules/coordinator.md`) est votre interlocuteur par défaut dans l'IDE Antigravity. Il vous accueille, planifie vos tâches et délègue aux agents spécialisés ou au développement technique.
-* **L'Agent Développeur** (`.agents/rules/developer.md`) vous assiste dans l'évolution du code du Hub.
+* **L'Agent Coordinateur** (`.agents/rules/coordinator.md`) : Chef d'orchestre dans Antigravity pour organiser vos tâches.
+* **L'Agent Développeur** (`.agents/rules/developer.md`) : Assistant technique pour coder et faire évoluer le moteur.
 
-### 1.2 L'Orchestration cloud (PAP)
-* **Le Moteur Unique (hub_engine)** : Un serveur FastAPI (`projects/hub_engine`) hébergeant les agents écrits en Python (via **PydanticAI**). Il utilise une base de données **SQLite** locale et une mémoire sémantique vectorielle légère (**ChromaDB/FAISS**).
-* **n8n** : Gère la plomberie (les appels d'API Microsoft/Google, la gestion des tokens de sécurité, la planification à 7h et les webhooks de votre bot Telegram).
-
----
-
-## 2. Structure du Monorepo
-
-* `.agents/` : Règles comportementales et guides pratiques (skills) pour vos agents IDE locaux.
-* `docs/` : Journalisation, préférences et TODO-lists de votre organisation personnelle.
-* `projects/` : Contient le code source technique (les Spokes).
-  * `projects/hub_engine/` : API FastAPI, logique des agents PydanticAI et base de données SQLite.
-* `docker-compose.yml` : Configuration Docker locale pour démarrer hub_engine et n8n en un clic.
+### 1.2 L'Orchestration Cloud (GCP)
+* **hub_engine (Cloud Run)** : Serveur FastAPI léger hébergeant les agents écrits sous **PydanticAI**.
+* **Cloud Scheduler** : Horloge 24/7 gratuite qui déclenche le briefing matinal quotidien à 7h00.
+* **Telegram Webhook Direct** : Réception et réponse instantanée aux commandes Telegram sans intermédiaire.
+* **Sécurité à 3 Verrous** : Basic Auth native sur le Web (`alex` + mot de passe), en-tête `X-API-Key` sur l'API, et Whitelist de votre ID Telegram unique.
 
 ---
 
-## 3. Guide de Démarrage Rapide (Développement)
+## 2. Structure du Dépôt
 
-*(À compléter au fil des phases d'implémentation)*
+* `.agents/` : Règles comportementales et guides pour l'agent Antigravity dans l'IDE.
+* `.github/workflows/` : Pipeline CI/CD pour déployer automatiquement sur Cloud Run à chaque `git push`.
+* `docs/` :
+  * `architecture_technique.md` : Architecture globale GCP Native Serverless.
+  * `specifications_techniques.md` : Spécifications détaillées des flux et de la sécurité.
+  * `process_guides/gcp_and_telegram_setup.md` : Guide pas-à-pas pour configurer GCP et votre Bot Telegram.
+  * `memory/` : Préférences et historiques sous format Markdown.
+* `projects/hub_engine/` : Code source Python (FastAPI + PydanticAI + Dockerfile).
+
+---
+
+## 3. Guides et Documentation
+
+* 📖 **[Guide de configuration GCP & Telegram](docs/process_guides/gcp_and_telegram_setup.md)**
+* 📐 **[Architecture Technique](docs/architecture_technique.md)**
+* 🧪 **Lancer les tests en local** :
+  ```bash
+  docker compose up -d
+  docker exec -e PYTHONPATH=/app hub_engine pytest
+  ```
