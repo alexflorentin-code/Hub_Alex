@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.config import settings
@@ -12,24 +13,22 @@ def test_health_endpoint():
     data = response.json()
     assert data["status"] == "online"
     assert "llm_configured" in data
+    assert "google_auth_configured" in data
     assert "telegram_configured" in data
 
-def test_basic_auth_required_on_index():
-    """Vérifie que l'accès à la page racine '/' est protégé par HTTP Basic Auth."""
-    response = client.get("/")
-    assert response.status_code == 401
-    assert "WWW-Authenticate" in response.headers
+def test_auth_config_endpoint(monkeypatch):
+    """Vérifie l'endpoint de configuration auth pour le frontend."""
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client-id-123.apps.googleusercontent.com")
+    monkeypatch.setattr(settings, "ALLOWED_GOOGLE_EMAIL", "alex.florentin@gmail.com")
 
-def test_basic_auth_success_on_index(monkeypatch):
-    """Vérifie que l'accès à '/' est autorisé avec les bons identifiants Basic Auth."""
-    monkeypatch.setattr(settings, "BASIC_AUTH_USERNAME", "alex")
-    monkeypatch.setattr(settings, "API_KEY", "secret-test-pass")
-
-    response = client.get("/", auth=("alex", "secret-test-pass"))
+    response = client.get("/api/v1/config/auth")
     assert response.status_code == 200
+    data = response.json()
+    assert data["google_client_id"] == "test-client-id-123.apps.googleusercontent.com"
+    assert data["allowed_email"] == "alex.florentin@gmail.com"
 
 def test_chat_endpoint_unauthorized():
-    """Vérifie que l'accès au chat API est refusé sans clé X-API-Key."""
+    """Vérifie que l'accès au chat API est refusé sans authentification."""
     response = client.post(
         "/api/v1/chat",
         headers={"X-API-Key": "mauvaise-cle"},
@@ -37,8 +36,8 @@ def test_chat_endpoint_unauthorized():
     )
     assert response.status_code == 401
 
-def test_chat_endpoint_success_with_test_model(monkeypatch):
-    """Vérifie le fonctionnement du chat en mode test."""
+def test_chat_endpoint_success_with_api_key(monkeypatch):
+    """Vérifie le fonctionnement du chat avec la clé X-API-Key."""
     monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
     monkeypatch.setattr(settings, "GEMINI_API_KEY", None)
     monkeypatch.setattr(settings, "API_KEY", "test-key-123")
@@ -53,11 +52,48 @@ def test_chat_endpoint_success_with_test_model(monkeypatch):
     assert data["status"] == "success"
     assert "Hub opérationnel en mode test" in data["summary"]
 
+@patch("google.oauth2.id_token.verify_oauth2_token")
+def test_chat_endpoint_success_with_google_token(mock_verify, monkeypatch):
+    """Vérifie le fonctionnement du chat avec un jeton Google Sign-In valide."""
+    mock_verify.return_value = {
+        "email": "alex.florentin@gmail.com",
+        "email_verified": True,
+        "name": "Alexandre Florentin",
+        "picture": "https://example.com/avatar.jpg"
+    }
+    monkeypatch.setattr(settings, "ALLOWED_GOOGLE_EMAIL", "alex.florentin@gmail.com")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", None)
+
+    response = client.post(
+        "/api/v1/chat",
+        headers={"Authorization": "Bearer fake-google-jwt-token"},
+        json={"message": "Bonjour"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+
+@patch("google.oauth2.id_token.verify_oauth2_token")
+def test_google_auth_endpoint_forbidden_for_other_email(mock_verify, monkeypatch):
+    """Vérifie que l'authentification échoue si l'email Google n'est pas le vôtre."""
+    mock_verify.return_value = {
+        "email": "hacker@example.com",
+        "email_verified": True,
+        "name": "Intruder"
+    }
+    monkeypatch.setattr(settings, "ALLOWED_GOOGLE_EMAIL", "alex.florentin@gmail.com")
+
+    response = client.post(
+        "/api/v1/auth/google",
+        json={"credential": "fake-intruder-token"}
+    )
+    assert response.status_code == 403
+
 def test_telegram_webhook_unauthorized_user(monkeypatch):
     """Vérifie que le bot Telegram ignore les utilisateurs non autorisés."""
     monkeypatch.setattr(settings, "ALLOWED_TELEGRAM_USER_ID", 123456789)
 
-    # Message provenant d'un ID inconnu (999999999)
     payload = {
         "update_id": 1,
         "message": {

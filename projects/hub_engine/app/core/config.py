@@ -7,9 +7,11 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # Sécurité & Authentification
-    # API_KEY est utilisé à la fois comme mot de passe pour Basic Auth et pour l'en-tête X-API-Key
     API_KEY: str = "alex"
-    BASIC_AUTH_USERNAME: str = "alex"
+    
+    # Authentification Google Sign-In (OAuth2)
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    ALLOWED_GOOGLE_EMAIL: str = "alex.florentin@gmail.com"
     
     # Clés LLM (Google Gemini par défaut)
     GEMINI_API_KEY: Optional[str] = None

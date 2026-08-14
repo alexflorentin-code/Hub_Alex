@@ -1,6 +1,6 @@
-# Guide Pas-à-Pas : Configuration Google Cloud & Bot Telegram
+# Guide Pas-à-Pas : Configuration Google Cloud, Google Sign-In & Bot Telegram
 
-Ce guide vous accompagne pas-à-pas pour configurer votre projet **Google Cloud Platform (GCP)**, créer votre **Bot Telegram** et activer le **déploiement automatique CI/CD**.
+Ce guide vous accompagne pas-à-pas pour configurer votre projet **Google Cloud Platform (GCP)**, sécuriser votre interface avec **Google Sign-In**, créer votre **Bot Telegram** et activer le **déploiement automatique CI/CD**.
 
 ---
 
@@ -21,7 +21,7 @@ Pour que le bot ne réponde qu'à vous seul :
 
 ---
 
-## Étape 2 : Configuration du projet Google Cloud (GCP) (5 minutes)
+## Étape 2 : Configuration du projet Google Cloud (GCP) (6 minutes)
 
 ### 2.1 Créer un nouveau projet GCP
 1. Rendez-vous sur la **[Console Google Cloud](https://console.cloud.google.com/)**.
@@ -30,7 +30,7 @@ Pour que le bot ne réponde qu'à vous seul :
 4. Notez l'**ID du projet** (ex: `hub-alex-432100`).
 
 ### 2.2 Activer les APIs nécessaires
-Dans la barre de recherche en haut, activez les 3 APIs suivantes :
+Dans la barre de recherche en haut de la console GCP, activez les 3 APIs suivantes :
 * **Cloud Run API**
 * **Artifact Registry API**
 * **Cloud Scheduler API**
@@ -43,7 +43,22 @@ Dans la barre de recherche en haut, activez les 3 APIs suivantes :
    * Région : **europe-west1 (Belgique)**
 3. Cliquez sur **Créer**.
 
-### 2.4 Créer le compte de service pour GitHub Actions (CI/CD)
+### 2.4 Créer l'identifiant Google Sign-In (OAuth 2.0 Client ID)
+Pour vous connecter à votre site web avec votre compte Google :
+1. Allez dans **APIs et services** > **Écran de consentement OAuth**.
+   * Type d'utilisateur : **Externe** (ou Interne si Google Workspace).
+   * Nom de l'application : `Hub_Alex`.
+   * Adresse e-mail d'assistance et de contact : votre adresse Gmail (`alex.florentin@gmail.com`).
+   * Cliquez sur **Enregistrer et continuer**.
+2. Allez dans **APIs et services** > **Identifiants** > **Créer des identifiants** > **ID client OAuth**.
+   * Type d'application : **Application Web**.
+   * Nom : `Hub_Alex Web Client`.
+   * **Origines JavaScript autorisées** :
+     * Ajoutez `http://localhost:8000` (pour vos tests locaux).
+     * (Vous ajouterez l'URL finale Cloud Run `https://hub-alex-xxxx.a.run.app` après le premier déploiement).
+3. Cliquez sur **Créer** et copiez l'**ID Client** généré (se terminant par `.apps.googleusercontent.com`). C'est votre `GOOGLE_CLIENT_ID`.
+
+### 2.5 Créer le compte de service pour GitHub Actions (CI/CD)
 1. Allez dans **IAM et administration** > **Comptes de service** > **Créer un compte de service**.
 2. Nom : `github-deployer` > Cliquez sur **Créer et continuer**.
 3. Donnez les 3 rôles suivants :
@@ -64,9 +79,10 @@ Allez sur votre dépôt GitHub : **[https://github.com/alexflorentin-code/Hub_Al
 | Nom du Secret | Description / Valeur |
 | :--- | :--- |
 | `GCP_PROJECT_ID` | L'ID de votre projet GCP (ex: `hub-alex-432100`) |
-| `GCP_SA_KEY` | Ouvrez le fichier JSON téléchargé à l'étape 2.4 et collez **tout le contenu JSON** |
-| `HUB_API_KEY` | Votre mot de passe secret (ex: `alex` ou une phrase secrète) |
-| `BASIC_AUTH_USERNAME` | `alex` |
+| `GCP_SA_KEY` | Ouvrez le fichier JSON téléchargé à l'étape 2.5 et collez **tout le contenu JSON** |
+| `HUB_API_KEY` | Une phrase secrète de secours (ex: `alex-super-secret-key`) |
+| `GOOGLE_CLIENT_ID` | Votre ID Client OAuth Google (ex: `xxxx.apps.googleusercontent.com`) |
+| `ALLOWED_GOOGLE_EMAIL` | Votre adresse Gmail (ex: `alex.florentin@gmail.com`) |
 | `GEMINI_API_KEY` | Votre clé API Google Gemini (`AIzaSy...`) |
 | `TELEGRAM_BOT_TOKEN` | Le jeton de votre bot Telegram (étape 1.1) |
 | `ALLOWED_TELEGRAM_USER_ID` | Votre ID numérique Telegram (étape 1.2) |
@@ -88,7 +104,7 @@ https://api.telegram.org/bot<VOTRE_TELEGRAM_BOT_TOKEN>/setWebhook?url=https://<V
 ```
 Telegram vous répondra : `{"ok":true,"result":true,"description":"Webhook was set"}`.
 
-🎉 **Félicitations !** Vous pouvez maintenant ouvrir votre application Telegram, envoyer un message à votre bot, et il vous répondra directement depuis Cloud Run !
+🎉 **Félicitations !** Vous pouvez maintenant ouvrir votre application Telegram, envoyer un message à votre bot, et vous connecter sur votre site web avec votre compte Google !
 
 ---
 

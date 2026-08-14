@@ -7,10 +7,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root {
             --bg-color: #0b0d19;
-            --card-bg: rgba(22, 28, 45, 0.45);
+            --card-bg: rgba(22, 28, 45, 0.55);
             --card-border: rgba(255, 255, 255, 0.08);
             --accent-primary: #6366f1; /* Indigo */
             --accent-primary-glow: rgba(99, 102, 241, 0.35);
@@ -18,7 +19,7 @@
             --accent-success: #10b981; /* Emerald */
             --text-main: #f3f4f6;
             --text-muted: #9ca3af;
-            --glass-blur: blur(16px);
+            --glass-blur: blur(20px);
         }
 
         * {
@@ -32,8 +33,8 @@
         body {
             background-color: var(--bg-color);
             background-image: 
-                radial-gradient(at 10% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-                radial-gradient(at 90% 80%, rgba(236, 72, 153, 0.1) 0px, transparent 50%);
+                radial-gradient(at 10% 20%, rgba(99, 102, 241, 0.18) 0px, transparent 50%),
+                radial-gradient(at 90% 80%, rgba(236, 72, 153, 0.12) 0px, transparent 50%);
             background-attachment: fixed;
             color: var(--text-main);
             height: 100vh;
@@ -57,6 +58,104 @@
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
             overflow: hidden;
             animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            position: relative;
+        }
+
+        /* --- LOGIN MODAL OVERLAY --- */
+        .auth-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 13, 25, 0.85);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+
+        .auth-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .auth-card {
+            background: rgba(26, 32, 53, 0.7);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 48px;
+            text-align: center;
+            max-width: 440px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            animation: scaleUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .auth-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            box-shadow: 0 0 30px var(--accent-primary-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 28px;
+            color: white;
+        }
+
+        .auth-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(to right, #ffffff, #e5e7eb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .auth-subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .auth-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--accent-success);
+            background: rgba(16, 185, 129, 0.1);
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            font-weight: 500;
+        }
+
+        .manual-key-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 13px;
+            text-decoration: underline;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: color 0.2s ease;
+        }
+
+        .manual-key-btn:hover {
+            color: var(--text-main);
         }
 
         /* --- SIDEBAR --- */
@@ -89,7 +188,6 @@
             font-weight: 700;
             font-size: 20px;
             color: white;
-            animation: logoPulse 3s infinite ease-in-out;
         }
 
         .brand-name {
@@ -102,31 +200,71 @@
             -webkit-text-fill-color: transparent;
         }
 
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 12px 16px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 15px;
+            color: white;
+            object-fit: cover;
+        }
+
+        .user-info {
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        .user-name {
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-email {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         .status-panel {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 12px;
             margin-bottom: 24px;
         }
 
         .status-item {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 14px 18px;
-            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 12px 16px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            transition: all 0.3s ease;
-        }
-
-        .status-item:hover {
-            border-color: rgba(255, 255, 255, 0.12);
-            background: rgba(255, 255, 255, 0.05);
         }
 
         .status-label {
-            font-size: 14px;
+            font-size: 13px;
             color: var(--text-muted);
             font-weight: 500;
         }
@@ -135,7 +273,7 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
         }
 
@@ -151,41 +289,29 @@
             box-shadow: 0 0 10px var(--accent-success);
         }
 
-        .nav-links {
+        .footer {
             display: flex;
             flex-direction: column;
             gap: 8px;
-        }
-
-        .nav-button {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            border-radius: 12px;
-            border: none;
-            background: transparent;
-            color: var(--text-muted);
-            cursor: pointer;
-            text-align: left;
-            font-size: 15px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .nav-button.active, .nav-button:hover {
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--text-main);
-            border-left: 3px solid var(--accent-primary);
-            padding-left: 13px;
-        }
-
-        .footer {
-            font-size: 12px;
-            color: var(--text-muted);
-            text-align: center;
             border-top: 1px solid var(--card-border);
             padding-top: 16px;
+        }
+
+        .logout-btn {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
         }
 
         /* --- CHAT AREA --- */
@@ -338,10 +464,6 @@
             box-shadow: 0 6px 15px var(--accent-primary-glow);
         }
 
-        .send-button:active {
-            transform: translateY(0);
-        }
-
         .send-button svg {
             width: 18px;
             height: 18px;
@@ -358,9 +480,9 @@
             to { opacity: 1; transform: scale(1); }
         }
 
-        @keyframes logoPulse {
-            0%, 100% { transform: scale(1); box-shadow: 0 0 15px var(--accent-primary-glow); }
-            50% { transform: scale(1.05); box-shadow: 0 0 25px var(--accent-primary-glow), 0 0 10px rgba(236, 72, 153, 0.4); }
+        @keyframes scaleUp {
+            from { opacity: 0; transform: scale(0.92); }
+            to { opacity: 1; transform: scale(1); }
         }
 
         @keyframes messageSlideIn {
@@ -369,27 +491,33 @@
         }
 
         /* Custom Scrollbar */
-        .chat-messages::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .chat-messages::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .chat-messages::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 4px;
-        }
-
-        .chat-messages::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.15);
-        }
+        .chat-messages::-webkit-scrollbar { width: 6px; }
+        .chat-messages::-webkit-scrollbar-track { background: transparent; }
+        .chat-messages::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 4px; }
     </style>
 </head>
 <body>
 
     <div class="container">
+        <!-- Google Sign-In Overlay (Affiche si non connecté) -->
+        <div class="auth-overlay" id="auth-overlay">
+            <div class="auth-card">
+                <div class="auth-logo">A</div>
+                <div>
+                    <h1 class="auth-title">Hub_Alex Control Center</h1>
+                    <p class="auth-subtitle">Accès privé et sécurisé par Google Identity</p>
+                </div>
+                <div class="auth-badge">
+                    <span class="dot dot-green"></span> Sécurité Google 2FA Active
+                </div>
+                
+                <!-- Google Sign-In Button Container -->
+                <div id="google-signin-btn" style="min-height: 44px; display: flex; justify-content: center;"></div>
+                
+                <button class="manual-key-btn" onclick="promptApiKey()">Ou se connecter via Clé d'API secrète</button>
+            </div>
+        </div>
+
         <!-- Sidebar -->
         <div class="sidebar">
             <div>
@@ -398,36 +526,32 @@
                     <div class="brand-name">Hub_Alex</div>
                 </div>
 
-                <div class="status-panel">
-                    <div class="status-item">
-                        <span class="status-label">FastAPI Engine</span>
-                        <span class="status-value"><span class="dot dot-green"></span>Actif</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">SQLite DB</span>
-                        <span class="status-value"><span class="dot dot-green"></span>Connecté</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Chroma Memory</span>
-                        <span class="status-value"><span class="dot dot-green"></span>Ok</span>
+                <div class="user-profile" id="user-profile" style="display: none;">
+                    <div class="user-avatar" id="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name" id="user-name">Alexandre Florentin</div>
+                        <div class="user-email" id="user-email">alex.florentin@gmail.com</div>
                     </div>
                 </div>
 
-                <div class="nav-links">
-                    <button class="nav-button active">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-message-square"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                        Conversations
-                    </button>
-                    <button class="nav-button" onclick="alert('Fonctionnalité d\'administration en cours d\'implémentation (Phase 4)')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-settings"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                        Configuration
-                    </button>
+                <div class="status-panel">
+                    <div class="status-item">
+                        <span class="status-label">Google Cloud Run</span>
+                        <span class="status-value"><span class="dot dot-green"></span>Actif</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Authentification</span>
+                        <span class="status-value"><span class="dot dot-green"></span>Google ID</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">PydanticAI</span>
+                        <span class="status-value"><span class="dot dot-green"></span>Prêt</span>
+                    </div>
                 </div>
             </div>
 
             <div class="footer">
-                Hub_Alex v0.1.0<br>
-                Propulsé par PydanticAI
+                <button class="logout-btn" onclick="logout()">Se Déconnecter</button>
             </div>
         </div>
 
@@ -436,19 +560,18 @@
             <div class="chat-header">
                 <div class="chat-title">
                     <h2>Coordinateur Principal</h2>
-                    <p>Agent d'organisation et d'automatisation personnelle</p>
+                    <p>Assistant d'organisation personnelle — Cloud Run</p>
                 </div>
                 <div style="font-size: 13px; color: var(--accent-success); font-weight: 500; display: flex; align-items: center; gap: 6px;">
-                    <span class="dot dot-green"></span> Prêt
+                    <span class="dot dot-green"></span> Connecté
                 </div>
             </div>
 
             <!-- Messages Window -->
             <div class="chat-messages" id="chat-messages">
-                <!-- Welcome Message -->
                 <div class="message assistant">
                     <div class="message-bubble">
-                        Bonjour Alexandre. Je suis ton **Coordinateur**. Bienvenue dans ton Control Center personnel. Comment puis-je t'assister aujourd'hui dans tes tâches ou ta veille ?
+                        Bonjour Alexandre. Je suis ton **Coordinateur** sécurisé par Google. Comment puis-je t'assister aujourd'hui dans tes tâches ou ta veille ?
                     </div>
                     <div class="message-time">À l'instant</div>
                 </div>
@@ -474,11 +597,103 @@
     <script>
         const chatMessages = document.getElementById('chat-messages');
         const userInput = document.getElementById('user-input');
+        const authOverlay = document.getElementById('auth-overlay');
+        const userProfile = document.getElementById('user-profile');
 
         function formatTime(date) {
             const hours = String(date.getHours()).padStart(2, '0');
             const minutes = String(date.getMinutes()).padStart(2, '0');
             return `${hours}:${minutes}`;
+        }
+
+        // Initialisation au chargement
+        window.addEventListener('DOMContentLoaded', async () => {
+            checkAuthStatus();
+            initGoogleAuth();
+        });
+
+        function checkAuthStatus() {
+            const token = sessionStorage.getItem('google_id_token') || localStorage.getItem('hub_api_key');
+            if (token) {
+                authOverlay.classList.add('hidden');
+                userProfile.style.display = 'flex';
+                const name = sessionStorage.getItem('user_name') || 'Alexandre';
+                const email = sessionStorage.getItem('user_email') || 'alex.florentin@gmail.com';
+                const pic = sessionStorage.getItem('user_pic');
+                
+                document.getElementById('user-name').innerText = name;
+                document.getElementById('user-email').innerText = email;
+                if (pic) {
+                    document.getElementById('user-avatar').innerHTML = `<img src="${pic}" style="width:100%;height:100%;border-radius:50%;">`;
+                }
+            } else {
+                authOverlay.classList.remove('hidden');
+                userProfile.style.display = 'none';
+            }
+        }
+
+        async function initGoogleAuth() {
+            try {
+                const res = await fetch('/api/v1/config/auth');
+                const config = await res.json();
+                
+                if (config.google_client_id && window.google) {
+                    google.accounts.id.initialize({
+                        client_id: config.google_client_id,
+                        callback: handleGoogleLogin
+                    });
+                    google.accounts.id.renderButton(
+                        document.getElementById("google-signin-btn"),
+                        { theme: "filled_blue", size: "large", shape: "pill", width: 280, text: "signin_with" }
+                    );
+                } else if (!config.google_client_id) {
+                    document.getElementById("google-signin-btn").innerHTML = `
+                        <button onclick="promptApiKey()" style="padding:10px 20px; border-radius:20px; background:var(--accent-primary); color:white; border:none; cursor:pointer; font-weight:600;">
+                            Connexion avec Clé d'API
+                        </button>
+                    `;
+                }
+            } catch (e) {
+                console.error("Erreur config auth :", e);
+            }
+        }
+
+        async function handleGoogleLogin(response) {
+            try {
+                const authRes = await fetch('/api/v1/auth/google', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: response.credential })
+                });
+
+                if (authRes.ok) {
+                    const data = await authRes.json();
+                    sessionStorage.setItem('google_id_token', response.credential);
+                    sessionStorage.setItem('user_name', data.name || 'Alexandre');
+                    sessionStorage.setItem('user_email', data.email);
+                    if (data.picture) sessionStorage.setItem('user_pic', data.picture);
+                    checkAuthStatus();
+                } else {
+                    const err = await authRes.json();
+                    alert("❌ " + (err.detail || "Accès refusé."));
+                }
+            } catch (e) {
+                alert("Erreur lors de la connexion Google.");
+            }
+        }
+
+        function promptApiKey() {
+            const key = prompt("Veuillez entrer votre clé d'API secrète :");
+            if (key) {
+                localStorage.setItem('hub_api_key', key.trim());
+                checkAuthStatus();
+            }
+        }
+
+        function logout() {
+            sessionStorage.clear();
+            localStorage.removeItem('hub_api_key');
+            checkAuthStatus();
         }
 
         function handleEnter(event) {
@@ -493,49 +708,41 @@
             const text = userInput.value.trim();
             if (!text) return;
 
-            // Clear Input
             userInput.value = '';
             userInput.style.height = '42px';
 
-            // Add User message
             const time = formatTime(new Date());
             appendMessage(text, 'user', time);
 
-            // Add loading placeholder
             const loadingId = 'loading-' + Date.now();
             appendLoading(loadingId);
 
             try {
-                // Récupérer la clé d'API du localStorage ou utiliser la clé par défaut
-                let apiKey = localStorage.getItem('hub_api_key') || 'super-secret-hub-key-change-me';
+                // Construction des en-têtes selon la méthode de connexion active
+                const headers = { 'Content-Type': 'application/json' };
+                const googleToken = sessionStorage.getItem('google_id_token');
+                const apiKey = localStorage.getItem('hub_api_key');
 
-                // Call API backend
+                if (googleToken) {
+                    headers['Authorization'] = `Bearer ${googleToken}`;
+                } else if (apiKey) {
+                    headers['X-API-Key'] = apiKey;
+                }
+
                 const response = await fetch('/api/v1/chat', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': apiKey
-                    },
+                    headers: headers,
                     body: JSON.stringify({ message: text })
                 });
-                
-                // Si non autorisé (401), demander la clé à l'utilisateur
-                if (response.status === 401) {
+
+                if (response.status === 401 || response.status === 403) {
                     document.getElementById(loadingId).remove();
-                    const newKey = prompt("Clé d'API incorrecte ou absente. Veuillez entrer la valeur de API_KEY configurée dans votre fichier .env :");
-                    if (newKey) {
-                        localStorage.setItem('hub_api_key', newKey.trim());
-                        userInput.value = text; // Remettre le texte pour ré-envoi rapide
-                        appendMessage("🔑 Clé d'API mise à jour. Tu peux renvoyer ton message !", 'assistant', formatTime(new Date()));
-                    } else {
-                        appendMessage("⚠️ Requête non autorisée (401). Renseigne ta clé API_KEY pour continuer.", 'assistant', formatTime(new Date()));
-                    }
+                    logout();
+                    alert("Session expirée ou non autorisée. Veuillez vous reconnecter.");
                     return;
                 }
-                
+
                 const data = await response.json();
-                
-                // Remove Loading
                 document.getElementById(loadingId).remove();
 
                 if (response.ok && data.response) {
@@ -544,9 +751,7 @@
                     appendMessage("⚠️ Une erreur est survenue lors de la communication avec l'agent.", 'assistant', formatTime(new Date()));
                 }
             } catch (e) {
-                if (document.getElementById(loadingId)) {
-                    document.getElementById(loadingId).remove();
-                }
+                if (document.getElementById(loadingId)) document.getElementById(loadingId).remove();
                 appendMessage("❌ Erreur de connexion avec le serveur backend.", 'assistant', formatTime(new Date()));
             }
         }
@@ -555,7 +760,6 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}`;
             
-            // Format basique du Markdown (gras et puces)
             let formattedContent = content
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -583,19 +787,8 @@
             `;
             chatMessages.appendChild(loadingDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
-            
-            // Inline loader style
-            const style = document.createElement('style');
-            style.innerHTML = `
-                @keyframes pulse {
-                    from { opacity: 0.3; transform: scale(0.8); }
-                    to { opacity: 1; transform: scale(1.2); }
-                }
-            `;
-            document.head.appendChild(style);
         }
         
-        // Auto-resize textarea
         userInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
