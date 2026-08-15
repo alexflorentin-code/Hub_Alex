@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 from .helpers import get_global_agent_context
 from app.core.config import settings
 from .veille import run_veille_analysis
+from .parapente import run_parapente_analysis
+from .email_agent import analyze_inbox, draft_email
 
 logger = logging.getLogger("hub_engine.coordinator")
 
@@ -30,34 +32,84 @@ def get_coordinator_system_prompt() -> str:
     global_context = get_global_agent_context()
     return (
         "Tu es l'Agent Coordinateur du Hub personnel d'Alexandre (Hub_Alex).\n"
-        "Ton rôle est d'accueillir l'utilisateur, de répondre à ses requêtes, d'organiser sa journée et d'orienter les actions.\n\n"
+        "Ton rôle est d'accueillir l'utilisateur, de répondre à ses requêtes, d'organiser sa journée, ses e-mails et sa veille.\n\n"
         f"{global_context}\n\n"
         "Directives comportementales :\n"
-        "- Sécurité de la messagerie : Ne jamais envoyer de mail direct, uniquement créer des brouillons.\n"
+        "- Sécurité de la messagerie : Ne JAMAIS envoyer de mail direct, uniquement créer des BROUILLONS dans Gmail.\n"
         "- Sécurité du code : Ne jamais modifier ou supprimer de fichier sans consentement.\n"
         "- Style : Sois toujours très synthétique, structuré en Markdown, et utile.\n"
     )
 
 async def run_coordinator(user_query: str) -> CoordinatorResponse:
-    # 1. Détection élargie des requêtes de veille technologique & IA
     query_lower = user_query.lower()
+
+    # 1. Détection des demandes de rédaction de brouillon d'e-mail
+    draft_triggers = ["rédige un mail", "redige un mail", "écris un mail", "ecris un mail", "prépare un mail", "prepare un mail", "brouillon", "draft"]
+    if any(k in query_lower for k in draft_triggers):
+        logger.info(f"Détection d'une intention de rédaction d'e-mail : '{user_query}'")
+        draft = await draft_email(user_query)
+        response_text = (
+            f"✉️ **Brouillon Gmail Enregistré avec Succès !**\n\n"
+            f"👤 **Pour :** `{draft.to}`\n"
+            f"📌 **Objet :** *{draft.subject}*\n\n"
+            f"📝 **Message :**\n"
+            f"```text\n{draft.body}\n```\n\n"
+            f"🛡️ *Le brouillon est déposé dans votre boîte Gmail. Vous pouvez le relire et cliquer sur 'Envoyer' quand vous le souhaitez.*"
+        )
+        return CoordinatorResponse(
+            status="success",
+            summary=f"Brouillon Gmail créé pour {draft.to}",
+            detailed_response=response_text,
+            action_taken="Génération du message et enregistrement du brouillon dans Gmail API.",
+            next_steps=["Ouvrir Gmail pour relire et expédier le message"]
+        )
+
+    # 2. Détection des demandes de consultation / synthèse d'e-mails
+    email_triage_triggers = ["mes mails", "mes e-mails", "mes emails", "boîte de réception", "inbox", "mails non lus", "emails non lus", "mails urgents"]
+    if any(k in query_lower for k in email_triage_triggers):
+        logger.info(f"Détection d'une demande de consultation d'e-mails : '{user_query}'")
+        inbox = await analyze_inbox()
+        return CoordinatorResponse(
+            status="success",
+            summary=f"Synthèse Gmail : {inbox.unread_count} message(s) analysé(s)",
+            detailed_response=inbox.telegram_formatted_message,
+            action_taken="Analyse et classification intelligente des e-mails via l'Agent Gmail.",
+            next_steps=["Demander la rédaction d'une réponse pour l'un des e-mails si besoin"]
+        )
+
+    # 3. Détection des demandes de veille Parapente & Vol Libre
+    parapente_triggers = [
+        "parapente", "vol libre", "fsvl", "shv", "ffvl", "dhv", "sellette", "cocon",
+        "xcmag", "cross country", "thermique", "aile en-", "ziad bassil", "rock the outdoor", "flybubble"
+    ]
+    if any(k in query_lower for k in parapente_triggers):
+        logger.info(f"Détection d'une intention de veille Parapente : '{user_query}' -> Délégation à l'Agent Parapente.")
+        parapente_digest = await run_parapente_analysis(user_query)
+        return CoordinatorResponse(
+            status="success",
+            summary=f"Synthèse Parapente : {parapente_digest.macro_trend[:80]}...",
+            detailed_response=parapente_digest.telegram_formatted_message,
+            action_taken="Collecte RSS et analyse vol libre (FSVL, matos, sécurité) via l'Agent Parapente.",
+            next_steps=["Consulter les sources en lien", "Demander la version Newsletter e-mail complète si besoin"]
+        )
+
+    # 4. Détection des demandes de veille technologique & IA
     veille_triggers = [
         "veille", "news_ia", "news-ia", "news ia", "actualit", "tendance",
         "nouveaut", "modèle", "modele", "quoi de neuf", "dernières nouvelles", "hacker news"
     ]
-    
     if any(k in query_lower for k in veille_triggers):
-        logger.info(f"Détection d'une intention de veille dans la requête : '{user_query}' -> Délégation à l'Agent de Veille.")
+        logger.info(f"Détection d'une intention de veille : '{user_query}' -> Délégation à l'Agent de Veille.")
         veille_digest = await run_veille_analysis(user_query)
         return CoordinatorResponse(
             status="success",
             summary=f"Synthèse Veille IA : {veille_digest.macro_trend[:80]}...",
             detailed_response=veille_digest.telegram_formatted_message,
             action_taken="Collecte RSS et analyse des tendances IA via l'Agent de Veille.",
-            next_steps=["Consulter les sources en lien", "Demander un format email / newsletter si souhaité"]
+            next_steps=["Consulter les sources en lien"]
         )
 
-    # 2. Exécution simulée si aucune clé API
+    # 4. Exécution simulée si aucune clé API
     if not settings.GEMINI_API_KEY and not settings.OPENAI_API_KEY:
         return CoordinatorResponse(
             status="success",
@@ -67,7 +119,7 @@ async def run_coordinator(user_query: str) -> CoordinatorResponse:
             next_steps=["Configurer les clés d'API dans .env", "Lancer docker-compose"]
         )
 
-    # 3. Exécution avec OpenAI si configuré
+    # 5. Exécution avec OpenAI si configuré
     system_prompt = get_coordinator_system_prompt()
     if settings.OPENAI_API_KEY:
         os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
@@ -75,7 +127,7 @@ async def run_coordinator(user_query: str) -> CoordinatorResponse:
         result = await agent.run(user_query)
         return result.output
 
-    # 4. Cascade multi-modèles Gemini pour haute disponibilité
+    # 6. Cascade multi-modèles Gemini pour haute disponibilité
     if settings.GEMINI_API_KEY:
         os.environ["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
         last_error = None

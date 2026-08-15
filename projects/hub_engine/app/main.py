@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 from fastapi import FastAPI, Depends, Header, HTTPException, status, Request, Query
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 import httpx
 from google.oauth2 import id_token
@@ -13,15 +13,18 @@ from google.auth.transport import requests as google_requests
 from app.core.config import settings
 from app.agents.coordinator import run_coordinator
 from app.agents.veille import run_veille_analysis, VeilleDigest
+from app.agents.parapente import run_parapente_analysis, ParapenteDigest
+from app.agents.email_agent import analyze_inbox, draft_email, InboxDigest, DraftProposal
+from app.services.gmail_service import generate_gmail_auth_url, exchange_auth_code_for_token
 
 # Configuration des logs (capturés nativement par Google Cloud Logging)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("hub_engine")
 
 app = FastAPI(
-    title="Hub_Alex Engine (GCP Native with Google Auth & Agent Veille)",
-    description="Backend API serverless, agents d'organisation et veille technologique.",
-    version="0.4.0"
+    title="Hub_Alex Engine (GCP Native — Veille & Gmail Agent)",
+    description="Backend API serverless, agents d'organisation, veille et intégration Gmail.",
+    version="0.5.0"
 )
 
 # Modèles Pydantic
@@ -43,16 +46,18 @@ class ChatResponse(BaseModel):
     status: str
     summary: str
 
-# 1. Dépendance de Sécurité : Vérification soit par Google ID Token (Web), soit par X-API-Key (CLI / Scheduler)
+class CreateDraftRequest(BaseModel):
+    instruction: str
+    recipient: Optional[str] = None
+
+# Dépendance de Sécurité : Vérification soit par Google ID Token (Web), soit par X-API-Key (CLI / Scheduler)
 def verify_access(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     authorization: Optional[str] = Header(None, alias="Authorization")
 ):
-    # Méthode 1 : Clé d'API (pour Cloud Scheduler ou appels directs)
     if x_api_key and secrets.compare_digest(x_api_key, settings.API_KEY):
         return {"auth_type": "api_key", "user": "api_user"}
 
-    # Méthode 2 : Jeton Google Sign-In (Bearer Token)
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split("Bearer ")[1].strip()
         try:
@@ -86,7 +91,7 @@ def verify_access(
         detail="Authentification requise : Veuillez vous connecter avec Google ou fournir un en-tête X-API-Key valide."
     )
 
-# --- ENDPOINTS D'AUTHENTIFICATION & CONFIGURATION ---
+# --- ENDPOINTS AUTHENTIFICATION & CONFIGURATION ---
 
 @app.get("/api/v1/config/auth")
 def get_auth_config():
@@ -127,11 +132,81 @@ def verify_google_login(request: GoogleAuthRequest):
             detail=f"Échec de l'authentification Google : {str(e)}"
         )
 
-# --- ENDPOINTS API ---
+# --- FLUX D'AUTORISATION GMAIL OAUTH2 (1-CLIC) ---
+
+@app.get("/api/v1/auth/gmail/connect")
+def connect_gmail(request: Request):
+    """Redirige vers l'écran d'autorisation Google pour connecter la boîte Gmail."""
+    redirect_uri = settings.GMAIL_REDIRECT_URI or str(request.url_for("gmail_callback"))
+    auth_url = generate_gmail_auth_url(redirect_uri)
+    return RedirectResponse(auth_url)
+
+@app.get("/api/v1/auth/gmail/callback")
+def gmail_callback(code: str, request: Request):
+    """Reçoit le code d'autorisation et affiche le Refresh Token obtenu."""
+    redirect_uri = settings.GMAIL_REDIRECT_URI or str(request.url_for("gmail_callback"))
+    try:
+        refresh_token = exchange_auth_code_for_token(code, redirect_uri)
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Connexion Gmail Réussie</title></head>
+        <body style="font-family:sans-serif; background:#0b0d19; color:white; padding:40px; text-align:center;">
+            <div style="max-width:600px; margin:0 auto; background:#161c2d; padding:30px; border-radius:16px; border:1px solid #374151;">
+                <h1 style="color:#10b981;">✅ Boîte Gmail Connectée !</h1>
+                <p>Votre Hub a désormais l'autorisation de lire vos e-mails et d'enregistrer des brouillons.</p>
+                <p style="color:#9ca3af; font-size:14px;">Votre Refresh Token persistant :</p>
+                <div style="background:#0b0d19; padding:12px; border-radius:8px; word-break:break-all; font-family:monospace; color:#6366f1;">
+                    {refresh_token}
+                </div>
+                <p style="margin-top:20px; font-size:13px; color:#9ca3af;">Copiez ce token dans votre secret GitHub <code>GMAIL_REFRESH_TOKEN</code> pour finaliser l'automatisation 24h/24.</p>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+    except Exception as e:
+        return HTMLResponse(f"<h1>❌ Erreur d'autorisation : {str(e)}</h1>", status_code=400)
+
+# --- ENDPOINTS GMAIL & EMAILS ---
+
+@app.get("/api/v1/emails/unread", response_model=InboxDigest)
+async def get_unread_emails_endpoint(user_auth: dict = Depends(verify_access)):
+    """Analyse et classifie les e-mails non lus de la boîte de réception."""
+    return await analyze_inbox()
+
+@app.post("/api/v1/emails/draft", response_model=DraftProposal)
+async def create_draft_endpoint(request: CreateDraftRequest, user_auth: dict = Depends(verify_access)):
+    """Génère et enregistre un brouillon dans Gmail selon la consigne donnée."""
+    return await draft_email(request.instruction, request.recipient)
+
+@app.post("/api/v1/emails/check-alerts")
+async def check_email_alerts_endpoint(user_auth: dict = Depends(verify_access)):
+    """Vérifie la boîte de réception et envoie une alerte Telegram si un e-mail urgent est détecté."""
+    inbox = await analyze_inbox()
+    if inbox.urgent_count > 0 and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
+        for urgent_mail in inbox.urgent_alerts:
+            alert_text = (
+                f"🚨 **ALERTE E-MAIL URGENT** 🚨\n\n"
+                f"👤 **De :** {urgent_mail.sender}\n"
+                f"📌 **Objet :** *{urgent_mail.subject}*\n\n"
+                f"📝 **Résumé :** {urgent_mail.summary}\n"
+                f"⚡ **Action Requise :** {urgent_mail.action_needed}\n"
+            )
+            telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(telegram_url, json={
+                    "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
+                    "text": alert_text,
+                    "parse_mode": "Markdown"
+                })
+    return {"status": "checked", "urgent_count": inbox.urgent_count}
+
+# --- ENDPOINTS CHAT, VEILLE & BRIEFING ---
 
 @app.get("/api/v1/health")
 def health_check():
-    """Endpoint de diagnostic rapide pour Cloud Run et Cloud Monitoring."""
+    """Endpoint de diagnostic rapide."""
     return {
         "status": "online",
         "llm_configured": {
@@ -139,6 +214,7 @@ def health_check():
             "openai": settings.OPENAI_API_KEY is not None
         },
         "google_auth_configured": settings.GOOGLE_CLIENT_ID is not None,
+        "gmail_configured": settings.GMAIL_REFRESH_TOKEN is not None,
         "telegram_configured": {
             "token_present": settings.TELEGRAM_BOT_TOKEN is not None,
             "whitelist_active": settings.ALLOWED_TELEGRAM_USER_ID is not None
@@ -163,7 +239,6 @@ async def trigger_veille(
     user_auth: dict = Depends(verify_access)
 ):
     """Exécute l'analyse de veille complète (RSS + PydanticAI)."""
-    logger.info("Exécution de l'Agent de Veille via l'API...")
     digest = await run_veille_analysis()
 
     if send_telegram and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
@@ -175,17 +250,36 @@ async def trigger_veille(
             "disable_web_page_preview": True
         }
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(telegram_url, json=payload)
-            if resp.status_code != 200:
-                logger.error(f"Erreur d'envoi Telegram pour la veille : {resp.text}")
+            await client.post(telegram_url, json=payload)
+
+    return digest
+
+@app.post("/api/v1/parapente/run", response_model=ParapenteDigest)
+async def trigger_parapente(
+    send_telegram: bool = Query(True, description="Envoyer la synthèse sur Telegram si activé"),
+    user_auth: dict = Depends(verify_access)
+):
+    """Exécute l'analyse de veille Parapente & Vol Libre (FSVL, matos, sécurité)."""
+    logger.info("Exécution de l'Agent Parapente via l'API...")
+    digest = await run_parapente_analysis()
+
+    if send_telegram and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
+        telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
+            "text": digest.telegram_formatted_message,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
+        }
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            await client.post(telegram_url, json=payload)
 
     return digest
 
 @app.post("/api/v1/briefing")
 async def trigger_briefing(user_auth: dict = Depends(verify_access)):
     """Déclenché tous les matins à 7h par Google Cloud Scheduler."""
-    logger.info("Déclenchement du briefing matinal automatique.")
-    prompt = "Génère mon briefing matinal complet pour aujourd'hui : priorité des tâches, veille et agenda."
+    prompt = "Génère mon briefing matinal complet pour aujourd'hui : priorité des tâches, e-mails importants et agenda."
     agent_response = await run_coordinator(prompt)
     
     if settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
@@ -197,11 +291,7 @@ async def trigger_briefing(user_auth: dict = Depends(verify_access)):
             "disable_web_page_preview": True
         }
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(telegram_url, json=payload)
-            if resp.status_code != 200:
-                logger.error(f"Erreur d'envoi Telegram : {resp.text}")
-            else:
-                logger.info("Briefing envoyé sur Telegram avec succès.")
+            await client.post(telegram_url, json=payload)
 
     return {
         "status": "success",
@@ -226,34 +316,54 @@ async def telegram_webhook(request: Request):
     chat_id = message.get("chat", {}).get("id")
     text = message.get("text", "").strip()
 
-    # VERROU DE SÉCURITÉ : Whitelist de l'ID Telegram
+    # Sécurité : Whitelist ID Telegram
     if settings.ALLOWED_TELEGRAM_USER_ID is not None and sender_id != settings.ALLOWED_TELEGRAM_USER_ID:
-        logger.warning(f"Tentative d'accès non autorisée par l'ID Telegram : {sender_id} (Nom: {sender.get('first_name')})")
+        logger.warning(f"Accès non autorisé par l'ID Telegram : {sender_id}")
         return {"status": "unauthorized"}
 
     if not text:
         return {"status": "no text"}
 
-    logger.info(f"Message Telegram reçu de l'utilisateur {sender_id} : {text}")
+    logger.info(f"Message Telegram de {sender_id} : {text}")
 
-    # GESTION DES COMMANDES SPÉCIALISÉES
+    # GESTION DES COMMANDES TELEGRAM
     if text == "/start":
         reply_text = (
             "👋 **Bonjour Alexandre !** Je suis ton Coordinateur Hub_Alex.\n\n"
             "Commandes disponibles :\n"
-            "• `/news_ia` : Lancer la veille IA, nouveaux modèles et top GitHub.\n"
+            "• `/news_ia` : Lancer la veille IA & top GitHub.\n"
+            "• `/news_parapente` ou `/parapente` : Veille Vol Libre (FSVL, sorties matériel, sécurité).\n"
+            "• `/emails` ou `/inbox` : Voir la synthèse de ta boîte Gmail.\n"
+            "• `/draft <consigne>` : Rédiger un brouillon dans Gmail.\n"
             "• `/briefing` : Recevoir ton briefing du jour.\n"
-            "• Tu peux aussi simplement me poser une question ou me demander une tâche !"
+            "• Ou pose-moi n'importe quelle question en français !"
         )
     elif text.lower() in ["/news_ia", "/news-ia", "/newsia", "/veille"]:
-        logger.info("Commande de veille reçue via Telegram (/news_ia)...")
         veille_digest = await run_veille_analysis()
         reply_text = veille_digest.telegram_formatted_message
+    elif text.lower() in ["/news_parapente", "/news-parapente", "/newsparapente", "/parapente", "/fsvl", "/shv", "/vol_libre", "/vollibre"]:
+        parapente_digest = await run_parapente_analysis()
+        reply_text = parapente_digest.telegram_formatted_message
+    elif text.lower() in ["/emails", "/inbox", "/mails"]:
+        inbox_digest = await analyze_inbox()
+        reply_text = inbox_digest.telegram_formatted_message
+    elif text.lower().startswith("/draft"):
+        instruction = text[6:].strip()
+        if not instruction:
+            reply_text = "ℹ️ Utilisation : `/draft Rédige une réponse à Dupont pour lui dire que je valide le devis`"
+        else:
+            draft = await draft_email(instruction)
+            reply_text = (
+                f"✉️ **Brouillon Gmail Enregistré !**\n\n"
+                f"👤 **Pour :** `{draft.to}`\n"
+                f"📌 **Objet :** *{draft.subject}*\n\n"
+                f"```text\n{draft.body}\n```\n\n"
+                f"🛡️ *Le message est prêt dans votre boîte Gmail.*"
+            )
     elif text == "/briefing":
         agent_response = await run_coordinator("Génère mon briefing matinal complet.")
         reply_text = f"🌅 *Briefing Hub_Alex*\n\n{agent_response.detailed_response}"
     else:
-        # Exécuter l'Agent Coordinateur normal
         agent_response = await run_coordinator(text)
         reply_text = agent_response.detailed_response
 
@@ -273,7 +383,7 @@ async def telegram_webhook(request: Request):
                     payload.pop("parse_mode", None)
                     await client.post(telegram_url, json=payload)
             except Exception as e:
-                logger.error(f"Erreur lors de l'envoi de la réponse Telegram : {str(e)}")
+                logger.error(f"Erreur lors de l'envoi Telegram : {str(e)}")
 
     return {"status": "ok"}
 

@@ -14,9 +14,10 @@ Ce fichier liste les tâches d'implémentation et d'organisation du projet.
 
 ---
 
-## 📈 Phase 1 : Agent Veille (À faire)
-- [ ] Configurer le flux RSS dans n8n
-- [ ] Écrire l'agent de veille sous PydanticAI (filtres, résumés, notation de pertinence)
+## 📈 Phase 1 : Agents de Veille & Newsletters (En cours)
+- [x] Configurer le flux RSS de veille IA dans `projects/hub_engine`
+- [x] Écrire l'agent de veille IA sous PydanticAI (rapports Telegram et Newsletter Email)
+- [x] Déployer l'agent de veille Parapente (FSVL, sorties matériel, sécurité, XC)
 - [ ] Mettre en place la table de veille dans SQLite et l'indexation ChromaDB
 - [ ] Créer le rapport quotidien à 7h30 sur Telegram
 

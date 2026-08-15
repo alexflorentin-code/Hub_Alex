@@ -36,6 +36,21 @@ DEFAULT_SOURCES = [
     ("VentureBeat AI", "https://venturebeat.com/category/ai/feed/"),
 ]
 
+DEFAULT_PARAPENTE_SOURCES = [
+    # Fédérations & Sécurité
+    ("FSVL / SHV Suisse", "https://www.shv-fsvl.ch/fr/actualites/rss.xml"),
+    ("FFVL Actualités", "https://federation.ffvl.fr/rss.xml"),
+    ("DHV Sécurité & Technique", "https://www.dhv.de/db1/technicfeed.php"),
+    # Sorties Matériel & Tests
+    ("Rock the Outdoor", "https://rocktheoutdoor.com/feed/"),
+    ("Flybubble Blog", "https://flybubble.com/blog/feed/"),
+    ("Cross Country Gear", "https://xcmag.com/category/gear/feed/"),
+    ("Dust of the Universe", "https://ziadbassil.blogspot.com/feeds/posts/default"),
+    # Météo, Récits & Cross
+    ("Cross Country Magazine", "https://xcmag.com/feed/"),
+    ("Paragliding Forum", "https://www.paraglidingforum.com/rss.php"),
+]
+
 def clean_html(raw_html: str, max_chars: int = 350) -> str:
     """Nettoie le code HTML d'un résumé pour en extraire le texte pur."""
     if not raw_html:
@@ -86,11 +101,13 @@ async def fetch_single_feed(client: httpx.AsyncClient, source_name: str, url: st
     
     return items
 
-def load_sources_from_docs() -> List[tuple]:
-    """Charge les URLs de flux depuis docs/organization/veille_sources.md si disponible."""
-    sources_path = os.path.join(settings.DOCS_DIR, "organization", "veille_sources.md")
+def load_sources_from_docs(filename: str = "veille_sources.md", default_sources: Optional[List[tuple]] = None) -> List[tuple]:
+    """Charge les URLs de flux depuis docs/organization/<filename> si disponible."""
+    sources_path = os.path.join(settings.DOCS_DIR, "organization", filename)
+    fallback = default_sources if default_sources is not None else DEFAULT_SOURCES
+    
     if not os.path.exists(sources_path):
-        return DEFAULT_SOURCES
+        return fallback
 
     parsed_sources = []
     try:
@@ -104,12 +121,20 @@ def load_sources_from_docs() -> List[tuple]:
     except Exception as e:
         logger.error(f"Erreur lors de la lecture de {sources_path} : {str(e)}")
 
-    return parsed_sources if parsed_sources else DEFAULT_SOURCES
+    return parsed_sources if parsed_sources else fallback
 
 async def fetch_all_veille_items() -> List[FeedItem]:
-    """Récupère en parallèle les articles de toutes les sources surveillées."""
-    sources = load_sources_from_docs()
-    logger.info(f"Démarrage de la collecte RSS sur {len(sources)} sources...")
+    """Récupère en parallèle les articles de veille IA."""
+    return await fetch_topic_feed_items("veille_sources.md", DEFAULT_SOURCES)
+
+async def fetch_all_parapente_items() -> List[FeedItem]:
+    """Récupère en parallèle les articles de veille Parapente & Vol Libre."""
+    return await fetch_topic_feed_items("parapente_sources.md", DEFAULT_PARAPENTE_SOURCES)
+
+async def fetch_topic_feed_items(filename: str, default_sources: List[tuple]) -> List[FeedItem]:
+    """Récupère en parallèle les articles d'un ensemble de flux pour une thématique donnée."""
+    sources = load_sources_from_docs(filename, default_sources)
+    logger.info(f"Démarrage de la collecte RSS pour '{filename}' sur {len(sources)} sources...")
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         tasks = [fetch_single_feed(client, name, url) for name, url in sources]
@@ -124,5 +149,5 @@ async def fetch_all_veille_items() -> List[FeedItem]:
                 seen_links.add(item.link)
                 all_items.append(item)
 
-    logger.info(f"Collecte RSS terminée : {len(all_items)} articles uniques récupérés.")
+    logger.info(f"Collecte RSS ({filename}) terminée : {len(all_items)} articles uniques récupérés.")
     return all_items
