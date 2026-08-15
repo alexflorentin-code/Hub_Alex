@@ -1,50 +1,94 @@
-# Hub_Alex (Control Center Personnel — GCP Native)
+# Hub_Alex — Control Center Personnel (GCP Native & Multi-Agents)
 
-Bienvenue dans votre **Control Center personnel**, une plateforme d'automatisation et d'organisation personnelle 100% Serverless déployée sur **Google Cloud Platform (GCP)** pour **0 CHF / mois** (Free Tier).
+Bienvenue dans votre **Control Center personnel**, une plateforme d'organisation, d'intelligence et d'automatisation 100% Serverless hébergée sur **Google Cloud Platform (GCP)** pour **0 CHF / mois** (Free Tier).
 
 ---
 
-## 1. Fonctionnement Global
+## 🌟 Vue d'Ensemble des Fonctionnalités
 
 ```text
-  [ Telegram App ] ------------(Webhook HTTPS Direct)------------> [ Cloud Run : hub_engine ]
-                                                                          |
-  [ Cloud Scheduler ] --(Requête HTTP 7h00 du matin)--------------------->| (FastAPI + PydanticAI)
-                                                                          |
-  [ Mémoire & Préférences ] <---(Stockage Git / Markdown)-----------------+
+               +───────────────────────────────────────────────────+
+               |                  INTERFACES CLIENT                |
+               |                                                   |
+               |  📱 Telegram Bot (@alex_hub_control_bot)          |
+               |  🌐 Web Interface (Google Sign-In 2FA)            |
+               |  ⏰ Google Cloud Scheduler (Automatisations 24/7)  |
+               +─────────────────────────┬─────────────────────────+
+                                         │
+                                         ▼ (HTTPS / Webhook direct)
+               +───────────────────────────────────────────────────+
+               |             HUB_ENGINE (Google Cloud Run)         |
+               |                                                   |
+               |  🤖 Agent Coordinateur Général                    |
+               |  🧠 Agent Veille IA & GitHub Trending             |
+               |  🦅 Agent Veille Parapente & Vol Libre (FSVL/SHV) |
+               |  ✉️ Agent Gmail (Triage, Brouillons & Newsletters)|
+               +─────────────────────────┬─────────────────────────+
+                                         │
+                                         ▼
+               +───────────────────────────────────────────────────+
+               |                  SERVICES & MÉMOIRE               |
+               |                                                   |
+               |  📬 Boîte Gmail (alex.florentin@gmail.com)         |
+               |  📚 Flux RSS / Blogs & Communautés                |
+               |  📂 Mémoire Git Markdown (docs/memory/)           |
+               +───────────────────────────────────────────────────+
 ```
 
-### 1.1 L'Orchestration locale (IDE)
-* **L'Agent Coordinateur** (`.agents/rules/coordinator.md`) : Chef d'orchestre dans Antigravity pour organiser vos tâches.
-* **L'Agent Développeur** (`.agents/rules/developer.md`) : Assistant technique pour coder et faire évoluer le moteur.
+---
 
-### 1.2 L'Orchestration Cloud (GCP)
-* **hub_engine (Cloud Run)** : Serveur FastAPI léger hébergeant les agents écrits sous **PydanticAI**.
-* **Cloud Scheduler** : Horloge 24/7 gratuite qui déclenche le briefing matinal quotidien à 7h00.
-* **Telegram Webhook Direct** : Réception et réponse instantanée aux commandes Telegram sans intermédiaire.
-* **Sécurité à 3 Verrous** : Basic Auth native sur le Web (`alex` + mot de passe), en-tête `X-API-Key` sur l'API, et Whitelist de votre ID Telegram unique.
+## 🚀 Les 4 Piliers Actifs de Hub_Alex
+
+### 1. 🤖 Agent de Veille Technologique & IA
+* **Surveillance active** : Frontier Labs (OpenAI, DeepMind, Anthropic, Hugging Face), GitHub Trending IA, Simon Willison, Reddit r/LocalLLaMA, Hacker News Top Score, Techmeme.
+* **Format Mobile** : Commande `/news_ia` sur Telegram (synthèse percutante avec liens sources cliquables).
+* **Format Bureau / Newsletter** : Envoi automatique par e-mail au format HTML chaque **lundi à 08h00** (ou sur demande avec *« Envoie-moi la newsletter IA par mail »*).
+
+### 2. 🦅 Agent de Veille Parapente & Vol Libre
+* **Surveillance active** : FSVL/SHV Suisse, FFVL France, DHV Allemagne, Paragliding Forum, XCMag, Ziad Bassil (Dust of the Universe), Rock the Outdoor, Flybubble.
+* **Format Mobile** : Commande `/news_parapente` ou `/parapente` sur Telegram.
+* **Format Bureau / Newsletter** : Envoi automatique par e-mail au format HTML chaque **jeudi à 08h00** (ou sur demande avec *« Envoie-moi la newsletter parapente par mail »*).
+
+### 3. ✉️ Agent Gmail & Communication Sécurisée
+* **Génération de Brouillons (Drafts)** : Commande `/draft <consigne>` ou en langage naturel (*« Rédige un mail à Pierre pour confirmer le créneau »*). Rédige et enregistre le message dans votre boîte Gmail.
+* **Règle de Sécurité Absolue** : L'agent **n'envoie JAMAIS d'e-mail à des tiers sans votre consentement**. Vous relisez et cliquez sur "Envoyer" dans Gmail.
+* **Expédition Directe de Newsletters à Soi-Même** : Envoi direct des synthèses HTML vers `alex.florentin@gmail.com`.
+* **Tri & Alertes d'Urgence** : Commande `/emails` pour classifier les messages non lus (*🚨 Urgent, 📋 Action requise, 📰 Information*).
+
+### 4. 🛡️ Sécurité Maximale à 3 Verrous
+* 🌐 **Sur le Web** : Google Sign-In (OAuth2 / 2FA) réservé exclusivement à `alex.florentin@gmail.com`.
+* 📱 **Sur Telegram** : Whitelist stricte de votre ID utilisateur Telegram (`ALLOWED_TELEGRAM_USER_ID`).
+* 🔐 **Sur l'API** : En-tête `X-API-Key` pour les appels Cloud Scheduler et scripts autorisés.
 
 ---
 
-## 2. Structure du Dépôt
+## 📱 Commandes Disponibles sur Telegram
 
-* `.agents/` : Règles comportementales et guides pour l'agent Antigravity dans l'IDE.
-* `.github/workflows/` : Pipeline CI/CD pour déployer automatiquement sur Cloud Run à chaque `git push`.
-* `docs/` :
-  * `architecture_technique.md` : Architecture globale GCP Native Serverless.
-  * `specifications_techniques.md` : Spécifications détaillées des flux et de la sécurité.
-  * `process_guides/gcp_and_telegram_setup.md` : Guide pas-à-pas pour configurer GCP et votre Bot Telegram.
-  * `memory/` : Préférences et historiques sous format Markdown.
-* `projects/hub_engine/` : Code source Python (FastAPI + PydanticAI + Dockerfile).
+| Commande | Action |
+| :--- | :--- |
+| **`/start`** | Menu d'accueil et statut du Hub |
+| **`/news_ia`** | Synthèse instantanée de la veille IA & dépôts GitHub |
+| **`/parapente`** | Synthèse instantanée de la veille Vol Libre & sorties matériel |
+| **`/emails`** ou **`/inbox`** | Analyse et triage des e-mails non lus |
+| **`/draft <consigne>`** | Rédige et enregistre un brouillon dans votre boîte Gmail |
+| **`/briefing`** | Briefing quotidien (agenda, tâches et e-mails) |
+| **Langage naturel** | Posez n'importe quelle question en français ! |
 
 ---
 
-## 3. Guides et Documentation
+## 🛠️ Architecture Technique & Déploiement
 
-* 📖 **[Guide de configuration GCP & Telegram](docs/process_guides/gcp_and_telegram_setup.md)**
-* 📐 **[Architecture Technique](docs/architecture_technique.md)**
-* 🧪 **Lancer les tests en local** :
-  ```bash
-  docker compose up -d
-  docker exec -e PYTHONPATH=/app hub_engine pytest
-  ```
+* **Framework Backend** : FastAPI + PydanticAI (cascade de modèles Gemini 3.6/3.7/3.5/Flash-Latest).
+* **Hébergement** : Google Cloud Run (Région `europe-west1`).
+* **CI/CD** : Déploiement automatique sur `git push` via GitHub Actions ([.github/workflows/deploy_gcp.yml](.github/workflows/deploy_gcp.yml)).
+* **Coût d'infrastructure** : **0 CHF / mois**.
+
+---
+
+## 🧪 Tests Automatisés
+
+Pour lancer la suite de 30 tests unitaires en local :
+```bash
+docker compose up -d
+docker exec -e PYTHONPATH=/app hub_engine pytest
+```

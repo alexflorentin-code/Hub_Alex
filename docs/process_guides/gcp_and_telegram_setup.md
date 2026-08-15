@@ -78,11 +78,12 @@ Allez sur votre dépôt GitHub : **[https://github.com/alexflorentin-code/Hub_Al
 
 | Nom du Secret | Description / Valeur |
 | :--- | :--- |
-| `GCP_PROJECT_ID` | L'ID de votre projet GCP (ex: `hub-alex-432100`) |
-| `GCP_SA_KEY` | Ouvrez le fichier JSON téléchargé à l'étape 2.5 et collez **tout le contenu JSON** |
-| `HUB_API_KEY` | Une phrase secrète de secours (ex: `alex-super-secret-key`) |
-| `GOOGLE_CLIENT_ID` | Votre ID Client OAuth Google (ex: `xxxx.apps.googleusercontent.com`) |
-| `ALLOWED_GOOGLE_EMAIL` | Votre adresse Gmail (ex: `alex.florentin@gmail.com`) |
+| `GCP_PROJECT_ID` | L'ID de votre projet GCP (ex: `hub-alex-349005658641`) |
+| `GCP_SA_KEY` | Contenu JSON complet de la clé de compte de service (`github-deployer`) |
+| `HUB_API_KEY` | Une phrase secrète de secours pour sécuriser l'API (ex: `alex-secret-key`) |
+| `GOOGLE_CLIENT_ID` | Votre ID Client OAuth Google pour le Web (ex: `xxxx.apps.googleusercontent.com`) |
+| `ALLOWED_GOOGLE_EMAIL` | Votre adresse Gmail (`alex.florentin@gmail.com`) |
+| `GMAIL_APP_PASSWORD` | Mot de passe d'application Gmail 16 lettres (obtenu sur https://myaccount.google.com/apppasswords) |
 | `GEMINI_API_KEY` | Votre clé API Google Gemini (`AIzaSy...`) |
 | `TELEGRAM_BOT_TOKEN` | Le jeton de votre bot Telegram (étape 1.1) |
 | `ALLOWED_TELEGRAM_USER_ID` | Votre ID numérique Telegram (étape 1.2) |
@@ -93,30 +94,14 @@ Allez sur votre dépôt GitHub : **[https://github.com/alexflorentin-code/Hub_Al
 
 ### 4.1 Lancer le premier déploiement
 Faites un simple `git push` sur la branche `main` ! 
-Allez dans l'onglet **Actions** sur GitHub : vous verrez le workflow construire l'image et la déployer sur Cloud Run en ~1 minute.
+Le workflow GitHub Actions construit l'image, la déploie sur Cloud Run et configure **automatiquement** les tâches Google Cloud Scheduler (`weekly-ai-news`, `weekly-parapente-news`).
 
 ### 4.2 Lier le bot Telegram à Cloud Run (Activer le Webhook)
-Une fois déployé, récupérez l'URL HTTPS de votre service Cloud Run (ex: `https://hub-alex-xxxx-ew.a.run.app`).
-
-Ouvrez votre navigateur et visitez cette URL pour enregistrer le webhook auprès de Telegram :
+Une fois déployé, enregistrez le webhook auprès de Telegram en ouvrant cette URL dans votre navigateur :
 ```text
 https://api.telegram.org/bot<VOTRE_TELEGRAM_BOT_TOKEN>/setWebhook?url=https://<VOTRE_URL_CLOUD_RUN>/api/v1/telegram/webhook
 ```
 Telegram vous répondra : `{"ok":true,"result":true,"description":"Webhook was set"}`.
 
-🎉 **Félicitations !** Vous pouvez maintenant ouvrir votre application Telegram, envoyer un message à votre bot, et vous connecter sur votre site web avec votre compte Google !
+🎉 **Félicitations !** Votre Hub personnel est 100% opérationnel ! Vous pouvez converser avec vos agents sur Telegram, recevoir vos veilles hebdomadaires par e-mail et sur mobile, et rédiger des brouillons dans Gmail.
 
----
-
-## Étape 5 : Activer le Briefing Quotidien à 7h (Optionnel)
-
-Dans la console Google Cloud :
-1. Allez dans **Cloud Scheduler** > **Créer un job**.
-2. Nom : `daily-briefing`
-3. Fréquence : `0 7 * * *` (Tous les jours à 7h00)
-4. Fuseau horaire : `Europe/Zurich` (ou `Europe/Paris`)
-5. Cible : **HTTP**
-   * URL : `https://<VOTRE_URL_CLOUD_RUN>/api/v1/briefing`
-   * Méthode : **POST**
-   * En-tête HTTP : `X-API-Key` avec votre mot de passe secret (`HUB_API_KEY`).
-6. Cliquez sur **Créer**. Vous recevrez désormais votre briefing automatiquement chaque matin à 7h sur Telegram !
