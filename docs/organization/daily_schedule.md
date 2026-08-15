@@ -15,3 +15,10 @@ Ce fichier contient le briefing de la journée en cours. Il est mis à jour chaq
 ### 📝 Tâches prioritaires du jour (Hub_Alex)
 1. Terminer l'initialisation de la Phase 0 (Structure locale et règles d'agents).
 2. Valider la liaison avec GitHub et effectuer le push.
+
+---
+
+## ⏰ Rendez-vous Automatiques Hebdomadaires
+* **Lundi 08:00 (Europe/Zurich)** : 🤖 **Veille IA & Nouveaux Modèles** (Cloud Scheduler `weekly-ai-news`)
+* **Jeudi 08:00 (Europe/Zurich)** : 🪂 **Veille Parapente, Matériel & FSVL** (Cloud Scheduler `weekly-parapente-news`)
+* **Tous les jours 07:00 (Europe/Zurich)** : 🌅 **Briefing Matinal & Priorités** (Cloud Scheduler `daily-briefing`)

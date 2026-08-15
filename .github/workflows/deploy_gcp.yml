@@ -49,10 +49,12 @@ jobs:
             --allow-unauthenticated \
             --set-env-vars "API_KEY=${{ secrets.HUB_API_KEY }},GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},ALLOWED_GOOGLE_EMAIL=${{ secrets.ALLOWED_GOOGLE_EMAIL }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }},ALLOWED_TELEGRAM_USER_ID=${{ secrets.ALLOWED_TELEGRAM_USER_ID }}"
 
-      - name: 7. Configuration automatique du Cloud Scheduler (Veille Lundi 8h)
+      - name: 7. Configuration automatique du Cloud Scheduler (Veilles IA & Parapente)
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format="value(status.url)")
           echo "Cloud Run URL: $URL"
+          
+          # 1. Veille IA hebdomadaire (Lundi 8h00)
           gcloud scheduler jobs create http weekly-ai-news \
             --location=${{ env.REGION }} \
             --schedule="0 8 * * 1" \
@@ -66,5 +68,22 @@ jobs:
             --schedule="0 8 * * 1" \
             --time-zone="Europe/Zurich" \
             --uri="${URL}/api/v1/veille/run?send_telegram=true" \
+            --http-method=POST \
+            --headers="X-API-Key=${{ secrets.HUB_API_KEY }}"
+
+          # 2. Veille Parapente & Vol Libre hebdomadaire (Jeudi 8h00)
+          gcloud scheduler jobs create http weekly-parapente-news \
+            --location=${{ env.REGION }} \
+            --schedule="0 8 * * 4" \
+            --time-zone="Europe/Zurich" \
+            --uri="${URL}/api/v1/parapente/run?send_telegram=true" \
+            --http-method=POST \
+            --headers="X-API-Key=${{ secrets.HUB_API_KEY }}" \
+            --description="Veille Parapente et Vol Libre envoyee sur Telegram chaque jeudi a 8h" \
+            || gcloud scheduler jobs update http weekly-parapente-news \
+            --location=${{ env.REGION }} \
+            --schedule="0 8 * * 4" \
+            --time-zone="Europe/Zurich" \
+            --uri="${URL}/api/v1/parapente/run?send_telegram=true" \
             --http-method=POST \
             --headers="X-API-Key=${{ secrets.HUB_API_KEY }}"
