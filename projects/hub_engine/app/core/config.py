@@ -14,10 +14,11 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: Optional[str] = None
     ALLOWED_GOOGLE_EMAIL: str = "alex.florentin@gmail.com"
     
-    # Intégration Gmail API (OAuth2)
+    # Intégration Gmail (OAuth2 ou Mot de passe d'application simple)
     GMAIL_CLIENT_SECRET: Optional[str] = None
     GMAIL_REFRESH_TOKEN: Optional[str] = None
     GMAIL_REDIRECT_URI: Optional[str] = None
+    GMAIL_APP_PASSWORD: Optional[str] = None
     
     # Clés LLM (Google Gemini par défaut)
     GEMINI_API_KEY: Optional[str] = None
@@ -37,7 +38,7 @@ class Settings(BaseSettings):
             return None
         return int(v)
 
-    @field_validator("GOOGLE_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN", "GMAIL_REDIRECT_URI", "GEMINI_API_KEY", "OPENAI_API_KEY", "TELEGRAM_BOT_TOKEN", mode="before")
+    @field_validator("GOOGLE_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN", "GMAIL_REDIRECT_URI", "GMAIL_APP_PASSWORD", "GEMINI_API_KEY", "OPENAI_API_KEY", "TELEGRAM_BOT_TOKEN", mode="before")
     @classmethod
     def parse_empty_strings(cls, v: Any) -> Optional[str]:
         if v == "":

@@ -47,7 +47,7 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "API_KEY=${{ secrets.HUB_API_KEY }},GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},ALLOWED_GOOGLE_EMAIL=${{ secrets.ALLOWED_GOOGLE_EMAIL }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }},ALLOWED_TELEGRAM_USER_ID=${{ secrets.ALLOWED_TELEGRAM_USER_ID }},GMAIL_CLIENT_SECRET=${{ secrets.GMAIL_CLIENT_SECRET }},GMAIL_REFRESH_TOKEN=${{ secrets.GMAIL_REFRESH_TOKEN }}"
+            --set-env-vars "API_KEY=${{ secrets.HUB_API_KEY }},GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},ALLOWED_GOOGLE_EMAIL=${{ secrets.ALLOWED_GOOGLE_EMAIL }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }},ALLOWED_TELEGRAM_USER_ID=${{ secrets.ALLOWED_TELEGRAM_USER_ID }},GMAIL_CLIENT_SECRET=${{ secrets.GMAIL_CLIENT_SECRET }},GMAIL_REFRESH_TOKEN=${{ secrets.GMAIL_REFRESH_TOKEN }},GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}"
 
       - name: 7. Configuration automatique du Cloud Scheduler (Veilles IA & Parapente avec Newsletter E-mail)
         run: |
