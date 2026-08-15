@@ -41,15 +41,38 @@ jobs:
           echo "DEPLOYED_IMAGE=$IMAGE_TAG" >> $GITHUB_ENV
 
       - name: 6. Déploiement sur Google Cloud Run
+        env:
+          HUB_API_KEY: ${{ secrets.HUB_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          ALLOWED_GOOGLE_EMAIL: ${{ secrets.ALLOWED_GOOGLE_EMAIL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ALLOWED_TELEGRAM_USER_ID: ${{ secrets.ALLOWED_TELEGRAM_USER_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: |
+          # Construction propre des variables d'environnement (en ignorant les variables vides)
+          ENV_LIST="API_KEY=${HUB_API_KEY:-alex}"
+          if [ -n "$ALLOWED_GOOGLE_EMAIL" ]; then ENV_LIST="$ENV_LIST,ALLOWED_GOOGLE_EMAIL=$ALLOWED_GOOGLE_EMAIL"; fi
+          if [ -n "$GOOGLE_CLIENT_ID" ]; then ENV_LIST="$ENV_LIST,GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"; fi
+          if [ -n "$GEMINI_API_KEY" ]; then ENV_LIST="$ENV_LIST,GEMINI_API_KEY=$GEMINI_API_KEY"; fi
+          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then ENV_LIST="$ENV_LIST,TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN"; fi
+          if [ -n "$ALLOWED_TELEGRAM_USER_ID" ]; then ENV_LIST="$ENV_LIST,ALLOWED_TELEGRAM_USER_ID=$ALLOWED_TELEGRAM_USER_ID"; fi
+          if [ -n "$GMAIL_APP_PASSWORD" ]; then ENV_LIST="$ENV_LIST,GMAIL_APP_PASSWORD=$GMAIL_APP_PASSWORD"; fi
+          if [ -n "$GMAIL_CLIENT_SECRET" ]; then ENV_LIST="$ENV_LIST,GMAIL_CLIENT_SECRET=$GMAIL_CLIENT_SECRET"; fi
+          if [ -n "$GMAIL_REFRESH_TOKEN" ]; then ENV_LIST="$ENV_LIST,GMAIL_REFRESH_TOKEN=$GMAIL_REFRESH_TOKEN"; fi
+
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image ${{ env.DEPLOYED_IMAGE }} \
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "API_KEY=${{ secrets.HUB_API_KEY }},GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},ALLOWED_GOOGLE_EMAIL=${{ secrets.ALLOWED_GOOGLE_EMAIL }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }},ALLOWED_TELEGRAM_USER_ID=${{ secrets.ALLOWED_TELEGRAM_USER_ID }},GMAIL_CLIENT_SECRET=${{ secrets.GMAIL_CLIENT_SECRET }},GMAIL_REFRESH_TOKEN=${{ secrets.GMAIL_REFRESH_TOKEN }},GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}"
+            --set-env-vars "$ENV_LIST"
 
       - name: 7. Configuration automatique du Cloud Scheduler (Veilles IA & Parapente avec Newsletter E-mail)
+        env:
+          HUB_API_KEY: ${{ secrets.HUB_API_KEY }}
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format="value(status.url)")
           echo "Cloud Run URL: $URL"
@@ -61,7 +84,7 @@ jobs:
             --time-zone="Europe/Zurich" \
             --uri="${URL}/api/v1/veille/run?send_telegram=true&send_email=true" \
             --http-method=POST \
-            --headers="X-API-Key=${{ secrets.HUB_API_KEY }}" \
+            --headers="X-API-Key=${HUB_API_KEY:-alex}" \
             --description="Veille IA hebdomadaire envoyee sur Telegram et Gmail chaque lundi a 8h" \
             || gcloud scheduler jobs update http weekly-ai-news \
             --location=${{ env.REGION }} \
@@ -69,7 +92,7 @@ jobs:
             --time-zone="Europe/Zurich" \
             --uri="${URL}/api/v1/veille/run?send_telegram=true&send_email=true" \
             --http-method=POST \
-            --headers="X-API-Key=${{ secrets.HUB_API_KEY }}"
+            --headers="X-API-Key=${HUB_API_KEY:-alex}" || true
 
           # 2. Veille Parapente & Vol Libre hebdomadaire (Jeudi 8h00 : Telegram + E-mail)
           gcloud scheduler jobs create http weekly-parapente-news \
@@ -78,7 +101,7 @@ jobs:
             --time-zone="Europe/Zurich" \
             --uri="${URL}/api/v1/parapente/run?send_telegram=true&send_email=true" \
             --http-method=POST \
-            --headers="X-API-Key=${{ secrets.HUB_API_KEY }}" \
+            --headers="X-API-Key=${HUB_API_KEY:-alex}" \
             --description="Veille Parapente et Vol Libre envoyee sur Telegram et Gmail chaque jeudi a 8h" \
             || gcloud scheduler jobs update http weekly-parapente-news \
             --location=${{ env.REGION }} \
@@ -86,4 +109,4 @@ jobs:
             --time-zone="Europe/Zurich" \
             --uri="${URL}/api/v1/parapente/run?send_telegram=true&send_email=true" \
             --http-method=POST \
-            --headers="X-API-Key=${{ secrets.HUB_API_KEY }}"
+            --headers="X-API-Key=${HUB_API_KEY:-alex}" || true
