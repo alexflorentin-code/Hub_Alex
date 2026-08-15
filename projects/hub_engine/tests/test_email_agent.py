@@ -100,3 +100,33 @@ def test_telegram_webhook_draft_command(monkeypatch):
     response = client.post("/api/v1/telegram/webhook", json=payload)
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+def test_markdown_to_html_newsletter():
+    from app.services.gmail_service import markdown_to_html_newsletter
+    md = "# Titre Newsletter\n\n> Tendance de fond\n\n* [Article 1](https://example.com) — Description de l'article"
+    html = markdown_to_html_newsletter(md, title="Test Newsletter")
+    assert "<!DOCTYPE html>" in html
+    assert "Titre Newsletter" in html
+    assert "href='https://example.com'" in html
+    assert "Hub_Alex" in html
+
+def test_send_email_to_self_simulated(monkeypatch):
+    from app.services.gmail_service import send_email_to_self
+    monkeypatch.setattr(settings, "GMAIL_REFRESH_TOKEN", None)
+    monkeypatch.setattr(settings, "ALLOWED_GOOGLE_EMAIL", "alex.florentin@gmail.com")
+
+    res = send_email_to_self("Test Subject", "# Contenu Markdown")
+    assert res["status"] == "simulated"
+    assert res["to"] == "alex.florentin@gmail.com"
+
+@pytest.mark.anyio
+async def test_coordinator_newsletter_by_email_intent(monkeypatch):
+    from app.agents.coordinator import run_coordinator
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", None)
+    monkeypatch.setattr(settings, "ALLOWED_GOOGLE_EMAIL", "alex.florentin@gmail.com")
+
+    res = await run_coordinator("Envoie-moi la newsletter IA par mail s'il te plaît")
+    assert res.status == "success"
+    assert "alex.florentin@gmail.com" in res.detailed_response
+

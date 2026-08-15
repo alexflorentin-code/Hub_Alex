@@ -226,3 +226,122 @@ def create_gmail_draft(
     except Exception as e:
         logger.error(f"Erreur lors de la création du brouillon Gmail : {str(e)}")
         raise e
+
+def markdown_to_html_newsletter(markdown_text: str, title: str = "Hub_Alex Newsletter") -> str:
+    """Convertit une synthèse Markdown en un e-mail HTML soigné et moderne."""
+    import re
+    
+    html_lines = []
+    lines = markdown_text.split("\n")
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            html_lines.append("<br/>")
+            continue
+        
+        # Titres
+        if stripped.startswith("# "):
+            h_text = stripped[2:].strip()
+            html_lines.append(f"<h1 style='color:#1e293b; font-size:24px; margin-top:24px; margin-bottom:12px; font-weight:800; border-bottom:2px solid #6366f1; padding-bottom:8px;'>{h_text}</h1>")
+        elif stripped.startswith("## "):
+            h_text = stripped[3:].strip()
+            html_lines.append(f"<h2 style='color:#334155; font-size:19px; margin-top:20px; margin-bottom:10px; font-weight:700;'>{h_text}</h2>")
+        elif stripped.startswith("### "):
+            h_text = stripped[4:].strip()
+            html_lines.append(f"<h3 style='color:#475569; font-size:16px; margin-top:16px; margin-bottom:6px; font-weight:600;'>{h_text}</h3>")
+        elif stripped.startswith("> "):
+            q_text = stripped[2:].strip()
+            html_lines.append(f"<blockquote style='background:#f8fafc; border-left:4px solid #6366f1; margin:12px 0; padding:12px 16px; color:#475569; font-style:italic;'>{q_text}</blockquote>")
+        elif stripped.startswith("* ") or stripped.startswith("- ") or stripped.startswith("• "):
+            li_text = stripped[2:].strip()
+            # Transformation des liens [Titre](url)
+            li_text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r"<a href='\2' style='color:#4f46e5; text-decoration:underline; font-weight:600;' target='_blank'>\1</a>", li_text)
+            # Transformation du gras **texte**
+            li_text = re.sub(r'\*\*([^*]+)\*\*', r"<strong>\1</strong>", li_text)
+            html_lines.append(f"<li style='margin-bottom:8px; line-height:1.6; color:#334155;'>{li_text}</li>")
+        else:
+            p_text = stripped
+            p_text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r"<a href='\2' style='color:#4f46e5; text-decoration:underline; font-weight:600;' target='_blank'>\1</a>", p_text)
+            p_text = re.sub(r'\*\*([^*]+)\*\*', r"<strong>\1</strong>", p_text)
+            html_lines.append(f"<p style='margin-bottom:12px; line-height:1.6; color:#334155;'>{p_text}</p>")
+            
+    content_body = "\n".join(html_lines)
+    
+    html_template = f"""
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{title}</title>
+    </head>
+    <body style="margin:0; padding:20px; background-color:#f1f5f9; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <div style="max-width:680px; margin:0 auto; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <!-- En-tête -->
+            <div style="background:linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); padding:28px 32px; color:#ffffff;">
+                <span style="background-color:rgba(99, 102, 241, 0.3); color:#c7d2fe; font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px; text-transform:uppercase; letter-spacing:0.05em;">Hub_Alex • Newsletter Hebdomadaire</span>
+                <h1 style="margin:12px 0 0 0; font-size:22px; font-weight:800; color:#ffffff;">{title}</h1>
+            </div>
+            <!-- Contenu -->
+            <div style="padding:32px; font-size:15px; color:#334155;">
+                {content_body}
+            </div>
+            <!-- Pied de page -->
+            <div style="background-color:#f8fafc; padding:20px 32px; text-align:center; border-top:1px solid #e2e8f0; font-size:12px; color:#94a3b8;">
+                <p style="margin:0;">Généré automatiquement par votre moteur personnel <strong>Hub_Alex</strong> (Google Cloud Run).</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_template
+
+def send_email_to_self(subject: str, markdown_content: str) -> dict:
+    """Envoie une newsletter ou un rapport directement dans la boîte Gmail d'Alexandre."""
+    recipient_email = settings.ALLOWED_GOOGLE_EMAIL
+    if not recipient_email:
+        raise ValueError("Adresse e-mail du propriétaire (ALLOWED_GOOGLE_EMAIL) non définie.")
+    
+    service = get_gmail_service()
+    if not service:
+        logger.warning(f"Envoi d'e-mail à soi-même simulé (service Gmail non connecté) vers {recipient_email}.")
+        return {
+            "status": "simulated",
+            "to": recipient_email,
+            "subject": subject
+        }
+
+    try:
+        message = PyEmailMessage()
+        message["To"] = recipient_email
+        message["From"] = recipient_email
+        message["Subject"] = subject
+        
+        # Version texte brut
+        message.set_content(markdown_content)
+        
+        # Version HTML riche
+        html_body = markdown_to_html_newsletter(markdown_content, title=subject)
+        message.add_alternative(html_body, subtype="html")
+
+        encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        sent_msg = service.users().messages().send(
+            userId="me",
+            body={"raw": encoded_message}
+        ).execute()
+        
+        msg_id = sent_msg.get("id", "unknown")
+        logger.info(f"Newsletter envoyée avec succès à {recipient_email} (Message ID: {msg_id}).")
+        
+        return {
+            "status": "sent",
+            "message_id": msg_id,
+            "to": recipient_email,
+            "subject": subject
+        }
+    except Exception as e:
+        logger.error(f"Erreur lors de l'envoi de l'e-mail à soi-même : {str(e)}")
+        raise e
+

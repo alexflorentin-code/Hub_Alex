@@ -9,6 +9,7 @@ from app.core.config import settings
 from .veille import run_veille_analysis
 from .parapente import run_parapente_analysis
 from .email_agent import analyze_inbox, draft_email
+from app.services.gmail_service import send_email_to_self
 
 logger = logging.getLogger("hub_engine.coordinator")
 
@@ -35,7 +36,7 @@ def get_coordinator_system_prompt() -> str:
         "Ton rôle est d'accueillir l'utilisateur, de répondre à ses requêtes, d'organiser sa journée, ses e-mails et sa veille.\n\n"
         f"{global_context}\n\n"
         "Directives comportementales :\n"
-        "- Sécurité de la messagerie : Ne JAMAIS envoyer de mail direct, uniquement créer des BROUILLONS dans Gmail.\n"
+        "- Sécurité de la messagerie : Ne JAMAIS envoyer de mail direct à des tiers (uniquement des BROUILLONS). L'envoi direct est réservé aux newsletters vers Alexandre lui-même.\n"
         "- Sécurité du code : Ne jamais modifier ou supprimer de fichier sans consentement.\n"
         "- Style : Sois toujours très synthétique, structuré en Markdown, et utile.\n"
     )
@@ -43,7 +44,48 @@ def get_coordinator_system_prompt() -> str:
 async def run_coordinator(user_query: str) -> CoordinatorResponse:
     query_lower = user_query.lower()
 
-    # 1. Détection des demandes de rédaction de brouillon d'e-mail
+    # 1. Détection des demandes d'envoi de Newsletter / Veille par e-mail vers soi-même
+    newsletter_triggers = ["newsletter", "par mail", "par e-mail", "par email", "m'envoyer la veille", "envoie la veille", "envoie-moi la veille"]
+    if any(k in query_lower for k in newsletter_triggers):
+        is_parapente = any(k in query_lower for k in ["parapente", "vol libre", "fsvl", "shv", "ffvl", "dhv", "sellette", "aile"])
+        if is_parapente:
+            logger.info("Envoi de la Newsletter Parapente par e-mail demandé par l'utilisateur.")
+            digest = await run_parapente_analysis()
+            subject = "🦅 Hub_Alex — Veille Hebdomadaire Parapente & Vol Libre"
+            send_email_to_self(subject=subject, markdown_content=digest.email_formatted_digest)
+            return CoordinatorResponse(
+                status="success",
+                summary=f"Newsletter Parapente envoyée à {settings.ALLOWED_GOOGLE_EMAIL}",
+                detailed_response=(
+                    f"✉️ **Newsletter Parapente Envoyée par E-mail !**\n\n"
+                    f"📬 **Destinataire :** `{settings.ALLOWED_GOOGLE_EMAIL}`\n"
+                    f"📌 **Objet :** *{subject}*\n\n"
+                    f"🌊 **Tendance :** {digest.macro_trend}\n\n"
+                    f"💡 *La version complète HTML avec tous les liens est disponible dans votre boîte Gmail !*"
+                ),
+                action_taken="Génération du digest et envoi de la newsletter HTML via l'API Gmail.",
+                next_steps=["Consulter la boîte de réception Gmail"]
+            )
+        else:
+            logger.info("Envoi de la Newsletter IA par e-mail demandé par l'utilisateur.")
+            digest = await run_veille_analysis()
+            subject = "🤖 Hub_Alex — Veille Hebdomadaire IA & Nouveaux Modèles"
+            send_email_to_self(subject=subject, markdown_content=digest.email_formatted_digest)
+            return CoordinatorResponse(
+                status="success",
+                summary=f"Newsletter IA envoyée à {settings.ALLOWED_GOOGLE_EMAIL}",
+                detailed_response=(
+                    f"✉️ **Newsletter IA Envoyée par E-mail !**\n\n"
+                    f"📬 **Destinataire :** `{settings.ALLOWED_GOOGLE_EMAIL}`\n"
+                    f"📌 **Objet :** *{subject}*\n\n"
+                    f"⚡ **Tendance :** {digest.macro_trend}\n\n"
+                    f"💡 *La version complète HTML avec tous les liens est disponible dans votre boîte Gmail !*"
+                ),
+                action_taken="Génération du digest et envoi de la newsletter HTML via l'API Gmail.",
+                next_steps=["Consulter la boîte de réception Gmail"]
+            )
+
+    # 2. Détection des demandes de rédaction de brouillon d'e-mail pour des tiers
     draft_triggers = ["rédige un mail", "redige un mail", "écris un mail", "ecris un mail", "prépare un mail", "prepare un mail", "brouillon", "draft"]
     if any(k in query_lower for k in draft_triggers):
         logger.info(f"Détection d'une intention de rédaction d'e-mail : '{user_query}'")

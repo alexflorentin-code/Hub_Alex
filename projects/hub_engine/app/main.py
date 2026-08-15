@@ -236,11 +236,13 @@ async def chat_endpoint(request: ChatRequest, user_auth: dict = Depends(verify_a
 @app.post("/api/v1/veille/run", response_model=VeilleDigest)
 async def trigger_veille(
     send_telegram: bool = Query(True, description="Envoyer la synthèse sur Telegram si activé"),
+    send_email: bool = Query(True, description="Envoyer la version newsletter HTML par e-mail à soi-même"),
     user_auth: dict = Depends(verify_access)
 ):
     """Exécute l'analyse de veille complète (RSS + PydanticAI)."""
     digest = await run_veille_analysis()
 
+    # 1. Envoi Telegram
     if send_telegram and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
         telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
         payload = {
@@ -251,18 +253,31 @@ async def trigger_veille(
         }
         async with httpx.AsyncClient(timeout=15.0) as client:
             await client.post(telegram_url, json=payload)
+
+    # 2. Envoi E-mail HTML à soi-même
+    if send_email and settings.ALLOWED_GOOGLE_EMAIL:
+        try:
+            from app.services.gmail_service import send_email_to_self
+            send_email_to_self(
+                subject="🤖 Hub_Alex — Veille Hebdomadaire IA & Nouveaux Modèles",
+                markdown_content=digest.email_formatted_digest
+            )
+        except Exception as e:
+            logger.warning(f"Impossible d'envoyer la newsletter IA par e-mail : {str(e)}")
 
     return digest
 
 @app.post("/api/v1/parapente/run", response_model=ParapenteDigest)
 async def trigger_parapente(
     send_telegram: bool = Query(True, description="Envoyer la synthèse sur Telegram si activé"),
+    send_email: bool = Query(True, description="Envoyer la version newsletter HTML par e-mail à soi-même"),
     user_auth: dict = Depends(verify_access)
 ):
     """Exécute l'analyse de veille Parapente & Vol Libre (FSVL, matos, sécurité)."""
     logger.info("Exécution de l'Agent Parapente via l'API...")
     digest = await run_parapente_analysis()
 
+    # 1. Envoi Telegram
     if send_telegram and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
         telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
         payload = {
@@ -273,6 +288,17 @@ async def trigger_parapente(
         }
         async with httpx.AsyncClient(timeout=15.0) as client:
             await client.post(telegram_url, json=payload)
+
+    # 2. Envoi E-mail HTML à soi-même
+    if send_email and settings.ALLOWED_GOOGLE_EMAIL:
+        try:
+            from app.services.gmail_service import send_email_to_self
+            send_email_to_self(
+                subject="🦅 Hub_Alex — Veille Hebdomadaire Parapente & Vol Libre",
+                markdown_content=digest.email_formatted_digest
+            )
+        except Exception as e:
+            logger.warning(f"Impossible d'envoyer la newsletter Parapente par e-mail : {str(e)}")
 
     return digest
 
