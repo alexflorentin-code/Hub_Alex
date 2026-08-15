@@ -222,6 +222,23 @@ def fetch_unread_emails(max_results: int = 10) -> List[EmailItem]:
     logger.info("Mode démo Gmail ou service non configuré.")
     return []
 
+def find_drafts_mailbox(mail: imaplib.IMAP4_SSL) -> str:
+    """Détecte automatiquement le nom exact du dossier Brouillons dans Gmail (FR: [Gmail]/Brouillons, EN: [Gmail]/Drafts)."""
+    try:
+        typ, data = mail.list()
+        if typ == "OK" and data:
+            for line in data:
+                decoded = line.decode("utf-8", errors="ignore")
+                if "\\Drafts" in decoded:
+                    parts = decoded.split('"/"')
+                    if len(parts) > 1:
+                        box_name = parts[1].strip().strip('"')
+                        return f'"{box_name}"'
+    except Exception as e:
+        logger.warning(f"Erreur détection dossier brouillons IMAP : {str(e)}")
+    
+    return '"[Gmail]/Brouillons"'
+
 def create_gmail_draft(to_email: str, subject: str, body_text: str, thread_id: Optional[str] = None) -> DraftResult:
     """Crée un brouillon dans la boîte Gmail de l'utilisateur."""
     # 1. Méthode Simple : Mot de Passe d'Application (IMAP Append)
@@ -236,15 +253,11 @@ def create_gmail_draft(to_email: str, subject: str, body_text: str, thread_id: O
             clean_pw = settings.GMAIL_APP_PASSWORD.replace(" ", "")
             with imaplib.IMAP4_SSL("imap.gmail.com", 993) as mail:
                 mail.login(settings.ALLOWED_GOOGLE_EMAIL, clean_pw)
-                # Trouver le dossier Brouillons
-                drafts_box = "[Gmail]/Drafts"
-                try:
-                    mail.select(drafts_box)
-                except Exception:
-                    drafts_box = "[Gmail]/Brouillons"
+                draft_folder = find_drafts_mailbox(mail)
                 
-                mail.append(drafts_box, "\\Draft", imaplib.Time2Internaldate(time.time()), msg.as_bytes())
-                logger.info(f"Brouillon créé via IMAP dans {drafts_box} pour {to_email}.")
+                res = mail.append(draft_folder, "(\\Draft \\Seen)", imaplib.Time2Internaldate(time.time()), msg.as_bytes())
+                logger.info(f"Brouillon créé via IMAP dans {draft_folder} pour {to_email} (résultat: {res}).")
+                
                 return DraftResult(
                     status="created",
                     draft_id="imap-draft-id",
