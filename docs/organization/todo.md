@@ -14,12 +14,15 @@ Ce fichier liste les tâches d'implémentation et d'organisation du projet.
 
 ---
 
-## 📈 Phase 1 : Agents de Veille & Newsletters (En cours)
+## 📈 Phase 1 : Agents de Veille, Météo & Newsletters
 - [x] Configurer le flux RSS de veille IA dans `projects/hub_engine`
 - [x] Écrire l'agent de veille IA sous PydanticAI (rapports Telegram et Newsletter Email)
 - [x] Déployer l'agent de veille Parapente (FSVL, sorties matériel, sécurité, XC)
-- [ ] Mettre en place la table de veille dans SQLite et l'indexation ChromaDB
-- [ ] Créer le rapport quotidien à 7h30 sur Telegram
+- [x] Déployer l'agent Météo Parapente & Aérologie (7 jours, Foehn, arbitrage Jura vs Valais, Val d'Illiez)
+- [x] Configurer l'envoi automatique des Newsletters par E-mail (Gmail API / App Password)
+- [x] Configurer les déclencheurs Google Cloud Scheduler (Lundi 8h/14h, Jeudi 8h, Vendredi 8h)
+- [ ] Mettre en place l'indexation vectorielle ChromaDB
+- [ ] Créer le rapport quotidien à 7h00 sur Telegram
 
 ---
 

@@ -67,11 +67,11 @@ class MeteoParapenteDigest(BaseModel):
     email_formatted_digest: str = Field(description="Newsletter complète au format Markdown structuré")
 
 GEMINI_METEO_MODELS = [
+    "google:gemini-2.5-flash",
+    "google:gemini-flash-latest",
     "google:gemini-3.7-flash",
     "google:gemini-3.6-flash",
-    "google:gemini-3.5-flash",
-    "google:gemini-flash-latest",
-    "google:gemini-2.5-flash"
+    "google:gemini-3.5-flash"
 ]
 
 SYSTEM_PROMPT = """

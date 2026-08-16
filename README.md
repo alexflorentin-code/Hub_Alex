@@ -37,25 +37,35 @@ Bienvenue dans votre **Control Center personnel**, une plateforme d'organisation
 
 ---
 
-## 🚀 Les 4 Piliers Actifs de Hub_Alex
+## 🚀 Les 5 Piliers Actifs de Hub_Alex
 
-### 1. 🤖 Agent de Veille Technologique & IA
+### 1. 🌤️ Agent Météo Parapente & Aérologie Locale
+* **Vision Macro & Synoptique** : Positionnement des dépressions, anticyclones européens et régime de flux sur la Suisse.
+* **Sécurité & Alertes Aérologiques** : Calcul du gradient de Foehn ($\Delta P$ Tessin - Plateau), vents étagés (sol, 1500m, 3000m), talwegs secs, cisaillements et convection (CAPE).
+* **Moyen Terme (7 jours)** : Tableau de volabilité hebdomadaire (🚀 *Gros Cross XC*, 🟢 *Volable*, 🟡 *Technique*, 🔴 *Non Volable*) et podium des meilleurs créneaux.
+* **Arbitrage Cross (Jura vs Valais vs Chablais)** : Comparatif en direct des plafonds alpins et des brises pour orienter le choix du massif.
+* **Focus Détaillé** : **Val d'Illiez / Portes du Soleil** en priorité pour les week-ends.
+* **Automatisations** :
+  - 🏔️ **Vendredi 08h00** : Bulletin week-end (Telegram & E-mail).
+  - 🌤️ **Lundi 14h00** : Perspective moyen terme 7 jours (Telegram & E-mail).
+
+### 2. 🤖 Agent de Veille Technologique & IA
 * **Surveillance active** : Frontier Labs (OpenAI, DeepMind, Anthropic, Hugging Face), GitHub Trending IA, Simon Willison, Reddit r/LocalLLaMA, Hacker News Top Score, Techmeme.
-* **Format Mobile** : Commande `/news_ia` sur Telegram (synthèse percutante avec liens sources cliquables).
-* **Format Bureau / Newsletter** : Envoi automatique par e-mail au format HTML chaque **lundi à 08h00** (ou sur demande avec *« Envoie-moi la newsletter IA par mail »*).
+* **Format Mobile** : Commande `/news_ia` sur Telegram.
+* **Format Bureau / Newsletter** : Envoi automatique par e-mail chaque **lundi à 08h00**.
 
-### 2. 🦅 Agent de Veille Parapente & Vol Libre
-* **Surveillance active** : FSVL/SHV Suisse, FFVL France, DHV Allemagne, Paragliding Forum, XCMag, Ziad Bassil (Dust of the Universe), Rock the Outdoor, Flybubble.
+### 3. 🦅 Agent de Veille Parapente & Vol Libre
+* **Surveillance active** : FSVL/SHV Suisse, FFVL France, DHV Allemagne, Paragliding Forum, XCMag, Ziad Bassil, Rock the Outdoor, Flybubble.
 * **Format Mobile** : Commande `/news_parapente` ou `/parapente` sur Telegram.
-* **Format Bureau / Newsletter** : Envoi automatique par e-mail au format HTML chaque **jeudi à 08h00** (ou sur demande avec *« Envoie-moi la newsletter parapente par mail »*).
+* **Format Bureau / Newsletter** : Envoi automatique par e-mail chaque **jeudi à 08h00**.
 
-### 3. ✉️ Agent Gmail & Communication Sécurisée
-* **Génération de Brouillons (Drafts)** : Commande `/draft <consigne>` ou en langage naturel (*« Rédige un mail à Pierre pour confirmer le créneau »*). Rédige et enregistre le message dans votre boîte Gmail.
-* **Règle de Sécurité Absolue** : L'agent **n'envoie JAMAIS d'e-mail à des tiers sans votre consentement**. Vous relisez et cliquez sur "Envoyer" dans Gmail.
+### 4. ✉️ Agent Gmail & Communication Sécurisée
+* **Génération de Brouillons (Drafts)** : Commande `/draft <consigne>` ou en langage naturel (*« Rédige un mail à Pierre »*).
+* **Règle de Sécurité Absolue** : L'agent **n'envoie JAMAIS d'e-mail à des tiers sans votre consentement**.
 * **Expédition Directe de Newsletters à Soi-Même** : Envoi direct des synthèses HTML vers `alex.florentin@gmail.com`.
-* **Tri & Alertes d'Urgence** : Commande `/emails` pour classifier les messages non lus (*🚨 Urgent, 📋 Action requise, 📰 Information*).
+* **Tri & Alertes d'Urgence** : Commande `/emails` pour classifier les messages non lus.
 
-### 4. 🛡️ Sécurité Maximale à 3 Verrous
+### 5. 🛡️ Sécurité Maximale à 3 Verrous
 * 🌐 **Sur le Web** : Google Sign-In (OAuth2 / 2FA) réservé exclusivement à `alex.florentin@gmail.com`.
 * 📱 **Sur Telegram** : Whitelist stricte de votre ID utilisateur Telegram (`ALLOWED_TELEGRAM_USER_ID`).
 * 🔐 **Sur l'API** : En-tête `X-API-Key` pour les appels Cloud Scheduler et scripts autorisés.
@@ -67,8 +77,10 @@ Bienvenue dans votre **Control Center personnel**, une plateforme d'organisation
 | Commande | Action |
 | :--- | :--- |
 | **`/start`** | Menu d'accueil et statut du Hub |
-| **`/news_ia`** | Synthèse instantanée de la veille IA & dépôts GitHub |
-| **`/parapente`** | Synthèse instantanée de la veille Vol Libre & sorties matériel |
+| **`/meteo`** ou **`/cross`** | Bulletin Météo Parapente, Volabilité & Arbitrage Jura vs Valais |
+| **`/weekend`** | Fiche météo détaillée sur le Val d'Illiez et les spots clés |
+| **`/news_parapente`** ou **`/parapente`** | Veille Vol Libre (FSVL, matos, sécurité) |
+| **`/news_ia`** | Synthèse de la veille IA & dépôts GitHub |
 | **`/emails`** ou **`/inbox`** | Analyse et triage des e-mails non lus |
 | **`/draft <consigne>`** | Rédige et enregistre un brouillon dans votre boîte Gmail |
 | **`/briefing`** | Briefing quotidien (agenda, tâches et e-mails) |
