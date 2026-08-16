@@ -214,7 +214,7 @@ def health_check():
             "openai": settings.OPENAI_API_KEY is not None
         },
         "google_auth_configured": settings.GOOGLE_CLIENT_ID is not None,
-        "gmail_configured": settings.GMAIL_REFRESH_TOKEN is not None,
+        "gmail_configured": (settings.GMAIL_REFRESH_TOKEN is not None) or (settings.GMAIL_APP_PASSWORD is not None),
         "telegram_configured": {
             "token_present": settings.TELEGRAM_BOT_TOKEN is not None,
             "whitelist_active": settings.ALLOWED_TELEGRAM_USER_ID is not None

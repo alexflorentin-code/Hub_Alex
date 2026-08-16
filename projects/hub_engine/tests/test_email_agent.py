@@ -113,6 +113,7 @@ def test_markdown_to_html_newsletter():
 def test_send_email_to_self_simulated(monkeypatch):
     from app.services.gmail_service import send_email_to_self
     monkeypatch.setattr(settings, "GMAIL_REFRESH_TOKEN", None)
+    monkeypatch.setattr(settings, "GMAIL_APP_PASSWORD", None)
     monkeypatch.setattr(settings, "ALLOWED_GOOGLE_EMAIL", "alex.florentin@gmail.com")
 
     res = send_email_to_self("Test Subject", "# Contenu Markdown")

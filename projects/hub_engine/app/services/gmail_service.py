@@ -249,6 +249,8 @@ def create_gmail_draft(to_email: str, subject: str, body_text: str, thread_id: O
             msg["To"] = to_email
             msg["From"] = settings.ALLOWED_GOOGLE_EMAIL
             msg["Subject"] = subject
+            msg["Date"] = email.utils.formatdate(localtime=True)
+            msg["Message-ID"] = email.utils.make_msgid()
             
             clean_pw = settings.GMAIL_APP_PASSWORD.replace(" ", "")
             with imaplib.IMAP4_SSL("imap.gmail.com", 993) as mail:
