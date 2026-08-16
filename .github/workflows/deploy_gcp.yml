@@ -110,3 +110,37 @@ jobs:
             --uri="${URL}/api/v1/parapente/run?send_telegram=true&send_email=true" \
             --http-method=POST \
             --headers="X-API-Key=${HUB_API_KEY:-alex}" || true
+
+          # 3. Météo Parapente & Anticipation Week-end (Vendredi 8h00 : Telegram + E-mail)
+          gcloud scheduler jobs create http meteo-weekend-briefing \
+            --location=${{ env.REGION }} \
+            --schedule="0 8 * * 5" \
+            --time-zone="Europe/Zurich" \
+            --uri="${URL}/api/v1/meteo/run?send_telegram=true&send_email=true" \
+            --http-method=POST \
+            --headers="X-API-Key=${HUB_API_KEY:-alex}" \
+            --description="Bulletin météo vol libre et cross pour le week-end (Val d'Illiez / Jura / Valais)" \
+            || gcloud scheduler jobs update http meteo-weekend-briefing \
+            --location=${{ env.REGION }} \
+            --schedule="0 8 * * 5" \
+            --time-zone="Europe/Zurich" \
+            --uri="${URL}/api/v1/meteo/run?send_telegram=true&send_email=true" \
+            --http-method=POST \
+            --headers="X-API-Key=${HUB_API_KEY:-alex}" || true
+
+          # 4. Météo Parapente & Perspective Semaine (Lundi 14h00 : Telegram + E-mail)
+          gcloud scheduler jobs create http meteo-week-outlook \
+            --location=${{ env.REGION }} \
+            --schedule="0 14 * * 1" \
+            --time-zone="Europe/Zurich" \
+            --uri="${URL}/api/v1/meteo/run?send_telegram=true&send_email=true" \
+            --http-method=POST \
+            --headers="X-API-Key=${HUB_API_KEY:-alex}" \
+            --description="Tendance météo parapente moyen terme 7 jours pour la semaine" \
+            || gcloud scheduler jobs update http meteo-week-outlook \
+            --location=${{ env.REGION }} \
+            --schedule="0 14 * * 1" \
+            --time-zone="Europe/Zurich" \
+            --uri="${URL}/api/v1/meteo/run?send_telegram=true&send_email=true" \
+            --http-method=POST \
+            --headers="X-API-Key=${HUB_API_KEY:-alex}" || true

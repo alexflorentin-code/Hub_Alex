@@ -20,5 +20,7 @@ Ce fichier contient le briefing de la journée en cours. Il est mis à jour chaq
 
 ## ⏰ Rendez-vous Automatiques Hebdomadaires
 * **Lundi 08:00 (Europe/Zurich)** : 🤖 **Veille IA & Nouveaux Modèles** (Cloud Scheduler `weekly-ai-news`)
+* **Lundi 14:00 (Europe/Zurich)** : 🌤️ **Météo Parapente & Perspective Semaine** (Cloud Scheduler `meteo-week-outlook`)
 * **Jeudi 08:00 (Europe/Zurich)** : 🪂 **Veille Parapente, Matériel & FSVL** (Cloud Scheduler `weekly-parapente-news`)
+* **Vendredi 08:00 (Europe/Zurich)** : 🏔️ **Météo Parapente & Anticipation Week-end** (Cloud Scheduler `meteo-weekend-briefing`)
 * **Tous les jours 07:00 (Europe/Zurich)** : 🌅 **Briefing Matinal & Priorités** (Cloud Scheduler `daily-briefing`)

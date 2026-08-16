@@ -8,6 +8,7 @@ from .helpers import get_global_agent_context
 from app.core.config import settings
 from .veille import run_veille_analysis
 from .parapente import run_parapente_analysis
+from .meteo_parapente import run_meteo_analysis
 from .email_agent import analyze_inbox, draft_email
 from app.services.gmail_service import send_email_to_self
 
@@ -86,7 +87,24 @@ async def run_coordinator(user_query: str) -> CoordinatorResponse:
             )
 
     # 2. Détection des demandes de rédaction de brouillon d'e-mail pour des tiers
-    draft_triggers = ["rédige un mail", "redige un mail", "écris un mail", "ecris un mail", "prépare un mail", "prepare un mail", "brouillon", "draft"]
+    draft_triggers = [
+        "rédige un mail", "redige un mail", "rédiger un mail", "rediger un mail",
+        "rédige un e-mail", "redige un e-mail", "rédiger un e-mail", "rediger un e-mail",
+        "rédige un email", "redige un email", "rédiger un email", "rediger un email",
+        "écris un mail", "ecris un mail", "écrire un mail", "ecrire un mail",
+        "écris un e-mail", "ecris un e-mail", "écrire un e-mail", "ecrire un e-mail",
+        "écris un email", "ecris un email", "écrire un email", "ecrire un email",
+        "écris à", "ecris a", "écrire à", "ecrire a",
+        "prépare un mail", "prepare un mail", "préparer un mail", "preparer un mail",
+        "prépare un e-mail", "prepare un e-mail", "préparer un e-mail", "preparer un e-mail",
+        "prépare un email", "prepare un email", "préparer un email", "preparer un email",
+        "crée un mail", "cree un mail", "créer un mail", "creer un mail",
+        "crée un e-mail", "cree un e-mail", "créer un e-mail", "creer un e-mail",
+        "crée un email", "cree un email", "créer un email", "creer un email",
+        "fais un mail", "faire un mail", "fais un e-mail", "faire un e-mail", "fais un email", "faire un email",
+        "envoie un mail", "envoyer un mail", "envoie un e-mail", "envoyer un e-mail", "envoie un email", "envoyer un email",
+        "brouillon", "draft", "mail pour", "e-mail pour", "email pour"
+    ]
     if any(k in query_lower for k in draft_triggers):
         logger.info(f"Détection d'une intention de rédaction d'e-mail : '{user_query}'")
         draft = await draft_email(user_query)
@@ -119,7 +137,25 @@ async def run_coordinator(user_query: str) -> CoordinatorResponse:
             next_steps=["Demander la rédaction d'une réponse pour l'un des e-mails si besoin"]
         )
 
-    # 3. Détection des demandes de veille Parapente & Vol Libre
+    # 3. Détection des demandes d'Aérologie, Météo Parapente & Cross
+    meteo_triggers = [
+        "météo", "meteo", "volable", "voler", "est-ce qu'on vole", "peut-on voler",
+        "cross", "plafond", "foehn", "bise", "aérologie", "aerologie",
+        "val d'illiez", "sonchaux", "suchet", "vercorin", "jura ou valais",
+        "conditions de vol", "synoptique", "anticyclone", "dépression", "depression"
+    ]
+    if any(k in query_lower for k in meteo_triggers):
+        logger.info(f"Détection d'une intention météo vol libre : '{user_query}' -> Délégation à l'Agent Météo Parapente.")
+        meteo_digest = await run_meteo_analysis(user_query)
+        return CoordinatorResponse(
+            status="success",
+            summary=f"Bulletin Météo Vol Libre : {meteo_digest.synoptic.regime_name[:70]}",
+            detailed_response=meteo_digest.telegram_formatted_message,
+            action_taken="Analyse synoptique, calculs de volabilité et potentiel cross via l'Agent Météo Parapente.",
+            next_steps=["Consulter les fiches spots détaillées", "Vérifier le Foehn et la Bise avant de monter au décollage"]
+        )
+
+    # 4. Détection des demandes de veille Parapente & Matériel / Actualités
     parapente_triggers = [
         "parapente", "vol libre", "fsvl", "shv", "ffvl", "dhv", "sellette", "cocon",
         "xcmag", "cross country", "thermique", "aile en-", "ziad bassil", "rock the outdoor", "flybubble"

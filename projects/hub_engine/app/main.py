@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.agents.coordinator import run_coordinator
 from app.agents.veille import run_veille_analysis, VeilleDigest
 from app.agents.parapente import run_parapente_analysis, ParapenteDigest
+from app.agents.meteo_parapente import run_meteo_analysis, MeteoParapenteDigest
 from app.agents.email_agent import analyze_inbox, draft_email, InboxDigest, DraftProposal
 from app.services.gmail_service import generate_gmail_auth_url, exchange_auth_code_for_token
 
@@ -302,6 +303,41 @@ async def trigger_parapente(
 
     return digest
 
+@app.post("/api/v1/meteo/run", response_model=MeteoParapenteDigest)
+async def trigger_meteo(
+    send_telegram: bool = Query(True, description="Envoyer le bulletin sur Telegram si activé"),
+    send_email: bool = Query(True, description="Envoyer la newsletter météo par e-mail"),
+    user_auth: dict = Depends(verify_access)
+):
+    """Exécute l'analyse d'aérologie, volabilité et potentiel cross pour les Alpes romandes et le Jura."""
+    logger.info("Exécution de l'Agent Météo Parapente via l'API...")
+    digest = await run_meteo_analysis()
+
+    # 1. Envoi Telegram
+    if send_telegram and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
+        telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
+            "text": digest.telegram_formatted_message,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
+        }
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            await client.post(telegram_url, json=payload)
+
+    # 2. Envoi E-mail à soi-même
+    if send_email and settings.ALLOWED_GOOGLE_EMAIL:
+        try:
+            from app.services.gmail_service import send_email_to_self
+            send_email_to_self(
+                subject="🪂 Hub_Alex — Bulletin Météo Parapente & Potentiel Cross",
+                markdown_content=digest.email_formatted_digest
+            )
+        except Exception as e:
+            logger.warning(f"Impossible d'envoyer le bulletin météo par e-mail : {str(e)}")
+
+    return digest
+
 @app.post("/api/v1/briefing")
 async def trigger_briefing(user_auth: dict = Depends(verify_access)):
     """Déclenché tous les matins à 7h par Google Cloud Scheduler."""
@@ -357,13 +393,17 @@ async def telegram_webhook(request: Request):
         reply_text = (
             "👋 **Bonjour Alexandre !** Je suis ton Coordinateur Hub_Alex.\n\n"
             "Commandes disponibles :\n"
-            "• `/news_ia` : Lancer la veille IA & top GitHub.\n"
+            "• `/meteo` ou `/cross` : Bulletin Météo Parapente, Volabilité & Arbitrage Jura vs Valais.\n"
             "• `/news_parapente` ou `/parapente` : Veille Vol Libre (FSVL, sorties matériel, sécurité).\n"
+            "• `/news_ia` : Lancer la veille IA & top GitHub.\n"
             "• `/emails` ou `/inbox` : Voir la synthèse de ta boîte Gmail.\n"
             "• `/draft <consigne>` : Rédiger un brouillon dans Gmail.\n"
             "• `/briefing` : Recevoir ton briefing du jour.\n"
             "• Ou pose-moi n'importe quelle question en français !"
         )
+    elif text.lower() in ["/meteo", "/cross", "/weekend", "/foehn", "/synop", "/voler"]:
+        meteo_digest = await run_meteo_analysis()
+        reply_text = meteo_digest.telegram_formatted_message
     elif text.lower() in ["/news_ia", "/news-ia", "/newsia", "/veille"]:
         veille_digest = await run_veille_analysis()
         reply_text = veille_digest.telegram_formatted_message
