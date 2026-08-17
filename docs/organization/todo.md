@@ -21,6 +21,8 @@ Ce fichier liste les tâches d'implémentation et d'organisation du projet.
 - [x] Déployer l'agent Météo Parapente & Aérologie (7 jours, Foehn, arbitrage Jura vs Valais, Val d'Illiez)
 - [x] Configurer l'envoi automatique des Newsletters par E-mail (Gmail API / App Password)
 - [x] Configurer les déclencheurs Google Cloud Scheduler (Lundi 8h/14h, Jeudi 8h, Vendredi 8h)
+- [x] Résoudre les timeouts du Webhook Telegram via BackgroundTasks asynchrones et déduplication d'update_id
+- [x] Ajouter les outils d'administration et de purge de la file Telegram (`/api/v1/telegram/webhook-info` et `/api/v1/telegram/flush`)
 - [ ] Mettre en place l'indexation vectorielle ChromaDB
 - [ ] Créer le rapport quotidien à 7h00 sur Telegram
 - [x] Rédiger le guide d'organisation Gmail & Inbox Zero ([guide](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/docs/process_guides/gmail_inbox_zero.md))
