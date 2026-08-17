@@ -1,39 +1,27 @@
-# Walkthrough — Phase 1 : Agent de Veille Technologique & IA
+# Walkthrough — Hub_Alex Engine & Agents
 
-L'**Agent de Veille IA** (Phase 1) est désormais entièrement développé, validé par **14 tests unitaires (100% de réussite)** et déployé sur **Google Cloud Run** via GitHub Actions.
-
----
-
-## 🌟 Ce qui a été développé
-
-### 1. Sourcing & Flux Curatés ([veille_sources.md](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/docs/organization/veille_sources.md))
-Surveillance automatique des 4 piliers d'excellence IA :
-* **Nouveaux Modèles & Frontier Labs** : OpenAI News, Google DeepMind / AI Blog, Hugging Face Blog, Anthropic Engineering.
-* **Top Dépôts GitHub & Outils Développeur** : GitHub Trending Python/IA, Simon Willison Weblog, Reddit r/LocalLLaMA.
-* **Débats & Buzz Communautaire** : Hacker News (Score > 50 pts), Techmeme.
-* **Business & Startups** : VentureBeat AI.
-
-### 2. Moteur Asynchrone & Parsing RSS ([rss_service.py](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/services/rss_service.py))
-* Téléchargement parallèle haute performance via `httpx.AsyncClient`.
-* Nettoyage du HTML des articles avec `BeautifulSoup`.
-* Dé-duplication automatique des liens et limitation aux articles les plus frais.
-
-### 3. Agent PydanticAI & Double Restitution ([veille.py](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/agents/veille.py))
-* **Analyse de la Grande Tendance de Fond Hebdomadaire** : Prise de recul sur les mouvements macro.
-* **Format Mobile Telegram** (`telegram_formatted_message`) : Condensé percutant avec émojis et liens sources cliquables `[Nom](url)`.
-* **Format Email Newsletter** (`email_formatted_digest`) : Digest complet structuré prêt à être envoyé par e-mail ou archivé.
-
-### 4. Commandes Telegram & API ([main.py](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/main.py))
-* Commande **`/news_ia`** (ou `/news-ia`) disponible directement dans votre chat Telegram.
-* Endpoint `POST /api/v1/veille/run` pour déclenchement programmatique ou via Cloud Scheduler.
-* Le Coordinateur répond aussi aux requêtes naturelles du type *« Fais-moi le point sur les actualités IA »*.
+Les agents de **Veille IA**, **Veille Parapente**, **Météo & Vol Libre**, et **Triage Gmail** sont opérationnels et déployés sur **Google Cloud Run** via GitHub Actions.
 
 ---
 
-## 🧪 Validation des Tests (14/14 Passed)
+## 🌟 Dernières Évolutions & Optimisations
 
-```text
-tests/test_main.py .........                                             [ 64%]
-tests/test_veille.py .....                                               [100%]
-======================= 14 passed in 7.11s ========================
-```
+### 1. Webhook Telegram Asynchrone & Anti-Boucle ([main.py](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/main.py))
+* **Acquittement Instantané (<50ms)** : Le webhook HTTP renvoie un `HTTP 200 OK` immédiat à Telegram et confie le travail lourd aux `BackgroundTasks` FastAPI.
+* **Résolution du problème de répétition** : Supprime définitivement les retentatives automatiques de Telegram (retries toutes les 2 min) causées par le temps d'exécution de l'analyse aérologique LLM.
+* **Cache de Déduplication (`update_id`)** : Filtre en mémoire les messages récents déjà traités.
+* **Feedback Utilisateur** : Notification d'activité `typing` envoyée immédiatement dans Telegram.
+
+### 2. Agent Météo Parapente & Aérologie Romande ([meteo_parapente.py](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/projects/hub_engine/app/agents/meteo_parapente.py))
+* Analyse multi-spots : Salève, Suchet / Jura, Vercorin / Valais, Val d'Illiez.
+* Détection automatique des gradients de pression synoptiques (Bise, Foehn).
+* Double restitution : format mobile Telegram court et format Newsletter HTML e-mail complète.
+* Déclenchement automatique par Google Cloud Scheduler le vendredi à 08h00 (week-end) et le lundi à 14h00 (semaine).
+
+### 3. Schedulers & Automatisations Cloud
+* `weekly-ai-news` : Lundi à 08h00 (Veille IA)
+* `meteo-week-outlook` : Lundi à 14h00 (Perspective Météo 7 jours)
+* `weekly-parapente-news` : Jeudi à 08h00 (Veille Matériel & FSVL)
+* `meteo-weekend-briefing` : Vendredi à 08h00 (Aérologie Week-end & Potentiel Cross)
+* `daily-briefing` : Tous les matins à 07h00 (Briefing quotidien)
+

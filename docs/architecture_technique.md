@@ -65,12 +65,19 @@ Le système est conçu selon une architecture **GCP Native Serverless**, élimin
 * **Framework d'Agents** : PydanticAI (type-safe, structuré, cascade de modèles Gemini 3.6/3.7/3.5/Flash-Latest).
 * **Service Gmail** (`app/services/gmail_service.py`) : Connexion par Mot de passe d'application (SMTP SSL 465 / IMAP SSL 993) ou OAuth2 API.
 * **Service RSS** (`app/services/rss_service.py`) : Moteur asynchrone de collecte et dé-duplication de flux.
-* **Webhook Telegram Direct** : Endpoint `/api/v1/telegram/webhook` qui reçoit les messages de Telegram et y répond instantanément.
+* **Service Aérologie & Météo** (`app/services/weather_service.py` & `app/agents/meteo_parapente.py`) : Prévisions Open-Meteo haute résolution pour 4 spots clés (Salève, Jura, Valais, Val d'Illiez), calculs de gradients de pression synoptiques (Bise, Foehn) et arbitrage vol libre.
+* **Webhook Telegram Direct Asynchrone** (`app/main.py` & `app/services/telegram_service.py`) :
+  * Endpoint `/api/v1/telegram/webhook` avec acquittement immédiat HTTP 200 (< 50ms) délégué aux `BackgroundTasks` pour éliminer tout risque de timeout et de boucle de relance Telegram.
+  * Cache LRU de déduplication des `update_id` (15 minutes de TTL) pour filtrer les réémissions résiduelles.
+  * Envoi d'un indicateur visuel d'activité `typing` dès la réception de la commande.
 
 ### 2.2 Orchestration & Automatisation GCP
-* **Google Cloud Scheduler** : Déclencheur cron sans serveur (0 CHF) configuré pour :
-  * *Veille IA Hebdomadaire* : Tous les lundis à 08h00 (`weekly-ai-news`).
-  * *Veille Parapente Hebdomadaire* : Tous les jeudis à 08h00 (`weekly-parapente-news`).
-  * *Briefing Quotidien* : Tous les matins à 07h00.
+* **Google Cloud Scheduler** : Déclencheurs cron sans serveur (0 CHF) configurés pour :
+  * *Veille IA Hebdomadaire* : Tous les lundis à 08h00 (`weekly-ai-news` -> Telegram + Email).
+  * *Météo Parapente & Perspective Semaine* : Tous les lundis à 14h00 (`meteo-week-outlook` -> Telegram + Email).
+  * *Veille Parapente & Matériel* : Tous les jeudis à 08h00 (`weekly-parapente-news` -> Telegram + Email).
+  * *Météo Parapente & Anticipation Week-end* : Tous les vendredis à 08h00 (`meteo-weekend-briefing` -> Telegram + Email).
+  * *Briefing Quotidien* : Tous les matins à 07h00 (`daily-briefing`).
 * **Google Artifact Registry** : Dépôt sécurisé d'images Docker (`hub-alex-repo`).
-* **GitHub Actions** : Pipeline CI/CD qui compile et déploie le conteneur automatiquement à chaque `git push origin main`.
+* **GitHub Actions** : Pipeline CI/CD qui compile et déploie le conteneur automatiquement sur Cloud Run à chaque `git push origin main`.
+

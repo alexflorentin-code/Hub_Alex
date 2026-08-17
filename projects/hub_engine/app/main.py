@@ -1,8 +1,10 @@
 import os
+import time
 import secrets
 import logging
+from collections import OrderedDict
 from typing import Optional
-from fastapi import FastAPI, Depends, Header, HTTPException, status, Request, Query
+from fastapi import FastAPI, Depends, Header, HTTPException, status, Request, Query, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, HTMLResponse
 from pydantic import BaseModel
@@ -17,7 +19,8 @@ from app.agents.parapente import run_parapente_analysis, ParapenteDigest
 from app.agents.meteo_parapente import run_meteo_analysis, MeteoParapenteDigest
 from app.agents.email_agent import analyze_inbox, draft_email, InboxDigest, DraftProposal
 from app.services.gmail_service import generate_gmail_auth_url, exchange_auth_code_for_token
-from app.services.telegram_service import send_telegram_message, get_bot_info
+from app.services.telegram_service import send_telegram_message, send_chat_action, get_bot_info
+
 
 # Configuration des logs (capturés nativement par Google Cloud Logging)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -347,13 +350,118 @@ async def trigger_briefing(user_auth: dict = Depends(verify_access)):
         "briefing": agent_response.detailed_response
     }
 
+# Cache de déduplication des update_id Telegram (évite les doublons et les boucles de retentative de Telegram)
+_processed_telegram_updates: OrderedDict[int, float] = OrderedDict()
+MAX_PROCESSED_UPDATES = 1000
+UPDATE_EXPIRATION_SECONDS = 900.0  # 15 minutes
+
+
+def _is_update_already_processed(update_id: int) -> bool:
+    """Vérifie si cet update_id a déjà été traité récemment et nettoie le cache expiré."""
+    now = time.time()
+    # Nettoyage des updates expirés
+    while _processed_telegram_updates:
+        oldest_id, oldest_time = next(iter(_processed_telegram_updates.items()))
+        if now - oldest_time > UPDATE_EXPIRATION_SECONDS or len(_processed_telegram_updates) > MAX_PROCESSED_UPDATES:
+            _processed_telegram_updates.pop(oldest_id)
+        else:
+            break
+
+    if update_id in _processed_telegram_updates:
+        return True
+
+    _processed_telegram_updates[update_id] = now
+    return False
+
+
+async def process_telegram_message(chat_id: Optional[int], text: str, sender_id: Optional[int]):
+    """
+    Traite le message Telegram en tâche de fond (asynchrone).
+    Permet à l'API de répondre immédiatement un HTTP 200 OK à Telegram, évitant
+    tout timeout et toute réexpédition en boucle (ex: toutes les 2 min).
+    """
+    if not text:
+        return
+
+    logger.info(f"Traitement asynchrone du message Telegram de {sender_id} : {text}")
+
+    # Indiquer immédiatement à Telegram que le bot est en train d'écrire / réfléchir
+    if chat_id:
+        await send_chat_action(chat_id=chat_id, action="typing")
+
+    reply_text = ""
+    try:
+        # GESTION DES COMMANDES TELEGRAM
+        if text == "/start":
+            reply_text = (
+                "👋 **Bonjour Alexandre !** Je suis ton Coordinateur Hub_Alex.\n\n"
+                "Commandes disponibles :\n"
+                "• `/meteo` ou `/cross` : Bulletin Météo Parapente, Volabilité & Arbitrage Jura vs Valais.\n"
+                "• `/news_parapente` ou `/parapente` : Veille Vol Libre (FSVL, sorties matériel, sécurité).\n"
+                "• `/news_ia` : Lancer la veille IA & top GitHub.\n"
+                "• `/emails` ou `/inbox` : Voir la synthèse de ta boîte Gmail.\n"
+                "• `/draft <consigne>` : Rédiger un brouillon dans Gmail.\n"
+                "• `/briefing` : Recevoir ton briefing du jour.\n"
+                "• Ou pose-moi n'importe quelle question en français !"
+            )
+        elif text.lower() in ["/meteo", "/cross", "/weekend", "/foehn", "/synop", "/voler"]:
+            meteo_digest = await run_meteo_analysis()
+            reply_text = meteo_digest.telegram_formatted_message
+        elif text.lower() in ["/news_ia", "/news-ia", "/newsia", "/veille"]:
+            veille_digest = await run_veille_analysis()
+            reply_text = veille_digest.telegram_formatted_message
+        elif text.lower() in ["/news_parapente", "/news-parapente", "/newsparapente", "/parapente", "/fsvl", "/shv", "/vol_libre", "/vollibre"]:
+            parapente_digest = await run_parapente_analysis()
+            reply_text = parapente_digest.telegram_formatted_message
+        elif text.lower() in ["/emails", "/inbox", "/mails"]:
+            inbox_digest = await analyze_inbox()
+            reply_text = inbox_digest.telegram_formatted_message
+        elif text.lower().startswith("/draft"):
+            instruction = text[6:].strip()
+            if not instruction:
+                reply_text = "ℹ️ Utilisation : `/draft Rédige une réponse à Dupont pour lui dire que je valide le devis`"
+            else:
+                draft = await draft_email(instruction)
+                reply_text = (
+                    f"✉️ **Brouillon Gmail Enregistré !**\n\n"
+                    f"👤 **Pour :** `{draft.to}`\n"
+                    f"📌 **Objet :** *{draft.subject}*\n\n"
+                    f"```text\n{draft.body}\n```\n\n"
+                    f"🛡️ *Le message est prêt dans votre boîte Gmail.*"
+                )
+        elif text == "/briefing":
+            agent_response = await run_coordinator("Génère mon briefing matinal complet.")
+            reply_text = f"🌅 *Briefing Hub_Alex*\n\n{agent_response.detailed_response}"
+        else:
+            agent_response = await run_coordinator(text)
+            reply_text = agent_response.detailed_response
+
+    except Exception as e:
+        logger.error(f"Erreur lors du traitement du message Telegram '{text}' : {str(e)}", exc_info=True)
+        reply_text = f"⚠️ Une erreur est survenue lors de l'exécution de votre demande : `{str(e)}`"
+
+    # Renvoyer la réponse à l'utilisateur sur Telegram
+    if chat_id and reply_text:
+        await send_telegram_message(reply_text, chat_id=chat_id)
+
+
 @app.post("/api/v1/telegram/webhook")
-async def telegram_webhook(request: Request):
-    """Webhook direct pour recevoir et répondre aux messages Telegram."""
+async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
+    """
+    Webhook direct pour recevoir et répondre aux messages Telegram.
+    Répond HTTP 200 OK immédiatement (<50ms) et délègue le traitement aux BackgroundTasks,
+    ce qui empêche tout timeout côté Telegram et supprime les boucles d'envoi répétées.
+    """
     try:
         update = await request.json()
     except Exception:
         return JSONResponse({"status": "invalid json"}, status_code=400)
+
+    # Déduplication par update_id pour bloquer les retries concurrentes ou résiduelles de Telegram
+    update_id = update.get("update_id")
+    if update_id is not None and _is_update_already_processed(update_id):
+        logger.info(f"Update Telegram {update_id} déjà traité (doublon ou retry ignoré).")
+        return {"status": "already_processed"}
 
     message = update.get("message") or update.get("edited_message")
     if not message:
@@ -372,56 +480,10 @@ async def telegram_webhook(request: Request):
     if not text:
         return {"status": "no text"}
 
-    logger.info(f"Message Telegram de {sender_id} : {text}")
+    logger.info(f"Message Telegram reçu de {sender_id} (update_id={update_id}) : {text}")
 
-    # GESTION DES COMMANDES TELEGRAM
-    if text == "/start":
-        reply_text = (
-            "👋 **Bonjour Alexandre !** Je suis ton Coordinateur Hub_Alex.\n\n"
-            "Commandes disponibles :\n"
-            "• `/meteo` ou `/cross` : Bulletin Météo Parapente, Volabilité & Arbitrage Jura vs Valais.\n"
-            "• `/news_parapente` ou `/parapente` : Veille Vol Libre (FSVL, sorties matériel, sécurité).\n"
-            "• `/news_ia` : Lancer la veille IA & top GitHub.\n"
-            "• `/emails` ou `/inbox` : Voir la synthèse de ta boîte Gmail.\n"
-            "• `/draft <consigne>` : Rédiger un brouillon dans Gmail.\n"
-            "• `/briefing` : Recevoir ton briefing du jour.\n"
-            "• Ou pose-moi n'importe quelle question en français !"
-        )
-    elif text.lower() in ["/meteo", "/cross", "/weekend", "/foehn", "/synop", "/voler"]:
-        meteo_digest = await run_meteo_analysis()
-        reply_text = meteo_digest.telegram_formatted_message
-    elif text.lower() in ["/news_ia", "/news-ia", "/newsia", "/veille"]:
-        veille_digest = await run_veille_analysis()
-        reply_text = veille_digest.telegram_formatted_message
-    elif text.lower() in ["/news_parapente", "/news-parapente", "/newsparapente", "/parapente", "/fsvl", "/shv", "/vol_libre", "/vollibre"]:
-        parapente_digest = await run_parapente_analysis()
-        reply_text = parapente_digest.telegram_formatted_message
-    elif text.lower() in ["/emails", "/inbox", "/mails"]:
-        inbox_digest = await analyze_inbox()
-        reply_text = inbox_digest.telegram_formatted_message
-    elif text.lower().startswith("/draft"):
-        instruction = text[6:].strip()
-        if not instruction:
-            reply_text = "ℹ️ Utilisation : `/draft Rédige une réponse à Dupont pour lui dire que je valide le devis`"
-        else:
-            draft = await draft_email(instruction)
-            reply_text = (
-                f"✉️ **Brouillon Gmail Enregistré !**\n\n"
-                f"👤 **Pour :** `{draft.to}`\n"
-                f"📌 **Objet :** *{draft.subject}*\n\n"
-                f"```text\n{draft.body}\n```\n\n"
-                f"🛡️ *Le message est prêt dans votre boîte Gmail.*"
-            )
-    elif text == "/briefing":
-        agent_response = await run_coordinator("Génère mon briefing matinal complet.")
-        reply_text = f"🌅 *Briefing Hub_Alex*\n\n{agent_response.detailed_response}"
-    else:
-        agent_response = await run_coordinator(text)
-        reply_text = agent_response.detailed_response
-
-    # Renvoyer la réponse à l'utilisateur sur Telegram
-    if chat_id:
-        await send_telegram_message(reply_text, chat_id=chat_id)
+    # Exécution asynchrone en arrière-plan
+    background_tasks.add_task(process_telegram_message, chat_id=chat_id, text=text, sender_id=sender_id)
 
     return {"status": "ok"}
 

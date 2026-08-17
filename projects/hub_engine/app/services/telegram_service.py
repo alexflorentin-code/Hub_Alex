@@ -108,6 +108,23 @@ async def send_telegram_message(
 
     return all_success
 
+async def send_chat_action(chat_id: Optional[int] = None, action: str = "typing") -> bool:
+    """Envoie une notification d'activité à Telegram (ex: 'typing') pendant que le Hub génère la réponse."""
+    token = settings.TELEGRAM_BOT_TOKEN
+    target_chat_id = chat_id or settings.ALLOWED_TELEGRAM_USER_ID
+
+    if not token or not target_chat_id:
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendChatAction"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json={"chat_id": target_chat_id, "action": action})
+            return resp.status_code == 200
+    except Exception as e:
+        logger.debug(f"Notification chat_action Telegram ignorée : {str(e)}")
+        return False
+
 async def get_bot_info() -> dict:
     """Vérifie la validité du Bot Token auprès des serveurs de Telegram."""
     if not settings.TELEGRAM_BOT_TOKEN:
@@ -123,3 +140,4 @@ async def get_bot_info() -> dict:
             return {"status": "error", "code": resp.status_code, "response": data}
     except Exception as e:
         return {"status": "exception", "error": str(e)}
+

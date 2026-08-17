@@ -19,6 +19,7 @@ Ce document est votre guide de référence pour maintenir votre boîte de récep
 | **`2. @Lecture`** | Promotions, IKEA, e-commerce, actualités générales et lectures de fond. | Automatique + Archivé de l'INBOX. |
 | **`3. @Administratif`** | Factures, reçus fiscaux, confirmations de commande, abonnements. | Automatique + Archivé de l'INBOX. |
 | **`Personnel/IncaMail`** | Courriers sécurisés IncaMail et archives officielles LVA. | Automatique + Archivé de l'INBOX. |
+| **`9. @À Supprimer`** | E-mails polluants obsolètes (promos < 2025, vieux réseaux sociaux, logs noreply) prêts pour suppression manuelle. | Regroupement sécurisé sans suppression définitive. |
 
 ---
 

@@ -66,9 +66,9 @@ def test_telegram_webhook_meteo_commands(monkeypatch):
     monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
     monkeypatch.setattr(settings, "GEMINI_API_KEY", None)
 
-    for cmd in ["/meteo", "/cross", "/weekend"]:
+    for i, cmd in enumerate(["/meteo", "/cross", "/weekend"]):
         payload = {
-            "update_id": 100,
+            "update_id": 500 + i,
             "message": {
                 "from": {"id": 11223344, "first_name": "Alex"},
                 "chat": {"id": 11223344},
@@ -78,6 +78,20 @@ def test_telegram_webhook_meteo_commands(monkeypatch):
         response = client.post("/api/v1/telegram/webhook", json=payload)
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
+
+    # Test de déduplication : le même update_id doit renvoyer already_processed
+    duplicate_payload = {
+        "update_id": 500,
+        "message": {
+            "from": {"id": 11223344, "first_name": "Alex"},
+            "chat": {"id": 11223344},
+            "text": "/meteo"
+        }
+    }
+    response_dup = client.post("/api/v1/telegram/webhook", json=duplicate_payload)
+    assert response_dup.status_code == 200
+    assert response_dup.json()["status"] == "already_processed"
+
 
 @pytest.mark.anyio
 async def test_coordinator_routing_meteo(monkeypatch):

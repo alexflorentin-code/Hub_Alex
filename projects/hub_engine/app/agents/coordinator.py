@@ -46,10 +46,30 @@ async def run_coordinator(user_query: str) -> CoordinatorResponse:
     query_lower = user_query.lower()
 
     # 1. Détection des demandes d'envoi de Newsletter / Veille par e-mail vers soi-même
-    newsletter_triggers = ["newsletter", "par mail", "par e-mail", "par email", "m'envoyer la veille", "envoie la veille", "envoie-moi la veille"]
+    newsletter_triggers = ["newsletter", "par mail", "par e-mail", "par email", "m'envoyer la veille", "envoie la veille", "envoie-moi la veille", "m'envoyer la météo", "envoie la météo", "envoie la meteo"]
     if any(k in query_lower for k in newsletter_triggers):
+        is_meteo = any(k in query_lower for k in ["météo", "meteo", "aérologie", "aerologie", "cross", "voler", "volable", "foehn", "bise", "jura", "valais"])
         is_parapente = any(k in query_lower for k in ["parapente", "vol libre", "fsvl", "shv", "ffvl", "dhv", "sellette", "aile"])
-        if is_parapente:
+
+        if is_meteo:
+            logger.info("Envoi de la Newsletter Météo Parapente par e-mail demandé par l'utilisateur.")
+            digest = await run_meteo_analysis()
+            subject = "🪂 Hub_Alex — Bulletin Météo Parapente & Potentiel Cross"
+            send_email_to_self(subject=subject, markdown_content=digest.email_formatted_digest)
+            return CoordinatorResponse(
+                status="success",
+                summary=f"Newsletter Météo envoyée à {settings.ALLOWED_GOOGLE_EMAIL}",
+                detailed_response=(
+                    f"✉️ **Newsletter Météo Parapente Envoyée par E-mail !**\n\n"
+                    f"📬 **Destinataire :** `{settings.ALLOWED_GOOGLE_EMAIL}`\n"
+                    f"📌 **Objet :** *{subject}*\n\n"
+                    f"🌤️ **Régime :** {digest.synoptic.regime_name}\n\n"
+                    f"💡 *Le bulletin météo complet avec tous les graphiques et spots est disponible dans votre boîte Gmail !*"
+                ),
+                action_taken="Génération du bulletin météo et envoi de la newsletter HTML via l'API Gmail.",
+                next_steps=["Consulter la boîte de réception Gmail"]
+            )
+        elif is_parapente:
             logger.info("Envoi de la Newsletter Parapente par e-mail demandé par l'utilisateur.")
             digest = await run_parapente_analysis()
             subject = "🦅 Hub_Alex — Veille Hebdomadaire Parapente & Vol Libre"
