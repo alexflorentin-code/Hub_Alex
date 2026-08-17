@@ -17,6 +17,7 @@ from app.agents.parapente import run_parapente_analysis, ParapenteDigest
 from app.agents.meteo_parapente import run_meteo_analysis, MeteoParapenteDigest
 from app.agents.email_agent import analyze_inbox, draft_email, InboxDigest, DraftProposal
 from app.services.gmail_service import generate_gmail_auth_url, exchange_auth_code_for_token
+from app.services.telegram_service import send_telegram_message, get_bot_info
 
 # Configuration des logs (capturés nativement par Google Cloud Logging)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -194,16 +195,10 @@ async def check_email_alerts_endpoint(user_auth: dict = Depends(verify_access)):
                 f"📝 **Résumé :** {urgent_mail.summary}\n"
                 f"⚡ **Action Requise :** {urgent_mail.action_needed}\n"
             )
-            telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                await client.post(telegram_url, json={
-                    "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
-                    "text": alert_text,
-                    "parse_mode": "Markdown"
-                })
+            await send_telegram_message(alert_text)
     return {"status": "checked", "urgent_count": inbox.urgent_count}
 
-# --- ENDPOINTS CHAT, VEILLE & BRIEFING ---
+# --- ENDPOINTS CHAT, VEILLE, MÉTÉO & BRIEFING ---
 
 @app.get("/api/v1/health")
 def health_check():
@@ -220,6 +215,30 @@ def health_check():
             "token_present": settings.TELEGRAM_BOT_TOKEN is not None,
             "whitelist_active": settings.ALLOWED_TELEGRAM_USER_ID is not None
         }
+    }
+
+@app.get("/api/v1/telegram/status")
+async def telegram_status(user_auth: dict = Depends(verify_access)):
+    """Vérifie l'état de la connexion avec les serveurs de Telegram."""
+    bot_info = await get_bot_info()
+    return {
+        "bot_configured": settings.TELEGRAM_BOT_TOKEN is not None,
+        "whitelist_user_id": settings.ALLOWED_TELEGRAM_USER_ID,
+        "telegram_api_response": bot_info
+    }
+
+@app.post("/api/v1/telegram/test")
+async def telegram_test_ping(
+    message: str = Query("🏓 **Test de connexion Hub_Alex !** Votre bot Telegram fonctionne parfaitement.", description="Message de test"),
+    user_auth: dict = Depends(verify_access)
+):
+    """Envoie un message de test immédiat vers le chat Telegram autorisé."""
+    logger.info("Envoi d'un message test sur Telegram...")
+    sent = await send_telegram_message(message)
+    return {
+        "success": sent,
+        "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
+        "message": message
     }
 
 @app.post("/api/v1/chat", response_model=ChatResponse)
@@ -243,17 +262,9 @@ async def trigger_veille(
     """Exécute l'analyse de veille complète (RSS + PydanticAI)."""
     digest = await run_veille_analysis()
 
-    # 1. Envoi Telegram
-    if send_telegram and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
-        telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
-            "text": digest.telegram_formatted_message,
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True
-        }
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.post(telegram_url, json=payload)
+    # 1. Envoi Telegram sécurisé et résilient
+    if send_telegram:
+        await send_telegram_message(digest.telegram_formatted_message)
 
     # 2. Envoi E-mail HTML à soi-même
     if send_email and settings.ALLOWED_GOOGLE_EMAIL:
@@ -278,17 +289,9 @@ async def trigger_parapente(
     logger.info("Exécution de l'Agent Parapente via l'API...")
     digest = await run_parapente_analysis()
 
-    # 1. Envoi Telegram
-    if send_telegram and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
-        telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
-            "text": digest.telegram_formatted_message,
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True
-        }
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.post(telegram_url, json=payload)
+    # 1. Envoi Telegram sécurisé et résilient
+    if send_telegram:
+        await send_telegram_message(digest.telegram_formatted_message)
 
     # 2. Envoi E-mail HTML à soi-même
     if send_email and settings.ALLOWED_GOOGLE_EMAIL:
@@ -313,17 +316,9 @@ async def trigger_meteo(
     logger.info("Exécution de l'Agent Météo Parapente via l'API...")
     digest = await run_meteo_analysis()
 
-    # 1. Envoi Telegram
-    if send_telegram and settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
-        telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
-            "text": digest.telegram_formatted_message,
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True
-        }
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.post(telegram_url, json=payload)
+    # 1. Envoi Telegram sécurisé et résilient
+    if send_telegram:
+        await send_telegram_message(digest.telegram_formatted_message)
 
     # 2. Envoi E-mail à soi-même
     if send_email and settings.ALLOWED_GOOGLE_EMAIL:
@@ -344,16 +339,7 @@ async def trigger_briefing(user_auth: dict = Depends(verify_access)):
     prompt = "Génère mon briefing matinal complet pour aujourd'hui : priorité des tâches, e-mails importants et agenda."
     agent_response = await run_coordinator(prompt)
     
-    if settings.TELEGRAM_BOT_TOKEN and settings.ALLOWED_TELEGRAM_USER_ID:
-        telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": settings.ALLOWED_TELEGRAM_USER_ID,
-            "text": f"🌅 *Briefing Quotidien Hub_Alex*\n\n{agent_response.detailed_response}",
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True
-        }
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.post(telegram_url, json=payload)
+    await send_telegram_message(f"🌅 *Briefing Quotidien Hub_Alex*\n\n{agent_response.detailed_response}")
 
     return {
         "status": "success",
@@ -434,22 +420,8 @@ async def telegram_webhook(request: Request):
         reply_text = agent_response.detailed_response
 
     # Renvoyer la réponse à l'utilisateur sur Telegram
-    if settings.TELEGRAM_BOT_TOKEN and chat_id:
-        telegram_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": reply_text,
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True
-        }
-        async with httpx.AsyncClient(timeout=35.0) as client:
-            try:
-                resp = await client.post(telegram_url, json=payload)
-                if resp.status_code != 200:
-                    payload.pop("parse_mode", None)
-                    await client.post(telegram_url, json=payload)
-            except Exception as e:
-                logger.error(f"Erreur lors de l'envoi Telegram : {str(e)}")
+    if chat_id:
+        await send_telegram_message(reply_text, chat_id=chat_id)
 
     return {"status": "ok"}
 

@@ -1,0 +1,81 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns='http://www.w3.org/2005/Atom' xmlns:apps='http://schemas.google.com/apps/2006'>
+	<title>Mail Filters — Hub_Alex</title>
+	<id>tag:mail.google.com,2008:filters:hub-alex</id>
+	<updated>2026-08-16T23:00:00Z</updated>
+	<author>
+		<name>Alexandre Florentin</name>
+		<email>alex.florentin@gmail.com</email>
+	</author>
+
+	<!-- Filtre 1 : Finance, Crypto & Crowdlending -> 6. @Finance & Investissement -->
+	<entry>
+		<category term='filter'></category>
+		<title>Mail Filter - Finance</title>
+		<id>tag:mail.google.com,2008:filter:finance</id>
+		<updated>2026-08-16T23:25:00Z</updated>
+		<content></content>
+		<apps:property name='hasTheWord' value='swissborg OR october OR viac OR binance OR kraken OR coinbase OR revolut OR crypto OR crowdlending OR yuh OR neon OR "trade republic"'/>
+		<apps:property name='shouldArchive' value='true'/>
+		<apps:property name='label' value='6. @Finance &amp; Investissement'/>
+	</entry>
+
+	<!-- Filtre 2 : Emploi & Carrière (Jobup, LinkedIn, Recruteurs) -> 4. @Emploi & Réseau -->
+	<entry>
+		<category term='filter'></category>
+		<title>Mail Filter - Emploi</title>
+		<id>tag:mail.google.com,2008:filter:emploi</id>
+		<updated>2026-08-16T23:00:00Z</updated>
+		<content></content>
+		<apps:property name='hasTheWord' value='jobup OR linkedin OR indeed OR michaelpage OR hays OR candidat OR recrutement'/>
+		<apps:property name='shouldArchive' value='true'/>
+		<apps:property name='label' value='4. @Emploi &amp; Réseau'/>
+	</entry>
+
+	<!-- Filtre 3 : Parapente & Vol Libre (FFVL, FSVL, Matos) -> Personnel/Parapente -->
+	<entry>
+		<category term='filter'></category>
+		<title>Mail Filter - Parapente</title>
+		<id>tag:mail.google.com,2008:filter:parapente</id>
+		<updated>2026-08-16T23:00:00Z</updated>
+		<content></content>
+		<apps:property name='hasTheWord' value='parapente OR ffvl OR fsvl OR ozone OR advance OR niviuk OR flymaster OR xcontest OR vol-libre'/>
+		<apps:property name='shouldArchive' value='true'/>
+		<apps:property name='label' value='Personnel/Parapente'/>
+	</entry>
+
+	<!-- Filtre 4 : Hub_Alex (Newsletters & Veilles du Hub) -> 5. @Hub_Alex -->
+	<entry>
+		<category term='filter'></category>
+		<title>Mail Filter - Hub_Alex</title>
+		<id>tag:mail.google.com,2008:filter:hub_alex</id>
+		<updated>2026-08-16T23:00:00Z</updated>
+		<content></content>
+		<apps:property name='hasTheWord' value='Hub_Alex OR HubAlex OR "[Hub_Alex]"'/>
+		<apps:property name='label' value='5. @Hub_Alex'/>
+	</entry>
+
+	<!-- Filtre 5 : Promotions, Shopping & Newsletters générales -> 2. @Lecture -->
+	<entry>
+		<category term='filter'></category>
+		<title>Mail Filter - Promos</title>
+		<id>tag:mail.google.com,2008:filter:promos</id>
+		<updated>2026-08-16T23:00:00Z</updated>
+		<content></content>
+		<apps:property name='hasTheWord' value='ikea OR promo OR soldes OR remise OR reduction OR "frais de port offerts"'/>
+		<apps:property name='shouldArchive' value='true'/>
+		<apps:property name='label' value='2. @Lecture'/>
+	</entry>
+
+	<!-- Filtre 6 : Factures & Reçus -> 3. @Administratif -->
+	<entry>
+		<category term='filter'></category>
+		<title>Mail Filter - Factures</title>
+		<id>tag:mail.google.com,2008:filter:factures</id>
+		<updated>2026-08-16T23:00:00Z</updated>
+		<content></content>
+		<apps:property name='hasTheWord' value='facture OR invoice OR "reçu de paiement" OR "confirmation de commande"'/>
+		<apps:property name='shouldArchive' value='true'/>
+		<apps:property name='label' value='3. @Administratif'/>
+	</entry>
+</feed>

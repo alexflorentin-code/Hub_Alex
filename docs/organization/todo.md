@@ -23,6 +23,10 @@ Ce fichier liste les tâches d'implémentation et d'organisation du projet.
 - [x] Configurer les déclencheurs Google Cloud Scheduler (Lundi 8h/14h, Jeudi 8h, Vendredi 8h)
 - [ ] Mettre en place l'indexation vectorielle ChromaDB
 - [ ] Créer le rapport quotidien à 7h00 sur Telegram
+- [x] Rédiger le guide d'organisation Gmail & Inbox Zero ([guide](file:///Users/alexandreflorentin/Documents/Git/Hub_Alex/docs/process_guides/gmail_inbox_zero.md))
+- [x] Créer les libellés Gmail clés (`0. @Action`, `1. @Attente`, `2. @Lecture`, `3. @Administratif`, `4. @Emploi & Réseau`, `5. @Hub_Alex`, `6. @Finance & Investissement`)
+- [x] Appliquer rétroactivement les filtres thématiques (Finance, Emploi, Parapente, Promos, IncaMail)
+- [x] Archiver les e-mails de l'INBOX antérieurs à 2025 (Inbox Zero opérationnel)
 
 ---
 
