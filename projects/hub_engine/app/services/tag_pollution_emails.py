@@ -50,8 +50,8 @@ def tag_pollution():
         except Exception:
             pass
 
-        # Exclusions de sécurité strictes (ne jamais marquer les factures, banques, contrats, pièces d'identité, parapente)
-        exclusion = "-facture -invoice -recu -commande -incamail -schweizerpass -assurance -contrat -banque -impot -taxe -ffvl -fsvl -parapente -ozone -advance -niviuk -vol-libre -shv"
+        # Exclusions de sécurité strictes (ne jamais marquer les factures, banques, contrats, pièces d'identité, parapente, pyxis)
+        exclusion = "-facture -invoice -recu -commande -incamail -schweizerpass -assurance -contrat -banque -impot -taxe -ffvl -fsvl -parapente -ozone -advance -niviuk -vol-libre -shv -pyxis -pyxis-suisse"
 
         pollution_rules = [
             (

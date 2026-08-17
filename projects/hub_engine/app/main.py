@@ -18,8 +18,7 @@ from app.agents.veille import run_veille_analysis, VeilleDigest
 from app.agents.parapente import run_parapente_analysis, ParapenteDigest
 from app.agents.meteo_parapente import run_meteo_analysis, MeteoParapenteDigest
 from app.agents.email_agent import analyze_inbox, draft_email, InboxDigest, DraftProposal
-from app.services.gmail_service import generate_gmail_auth_url, exchange_auth_code_for_token
-from app.services.telegram_service import send_telegram_message, send_chat_action, get_bot_info
+from app.services.telegram_service import send_telegram_message, send_chat_action, get_bot_info, get_webhook_info, flush_telegram_pending_updates
 
 
 # Configuration des logs (capturés nativement par Google Cloud Logging)
@@ -224,10 +223,27 @@ def health_check():
 async def telegram_status(user_auth: dict = Depends(verify_access)):
     """Vérifie l'état de la connexion avec les serveurs de Telegram."""
     bot_info = await get_bot_info()
+    webhook_info = await get_webhook_info()
     return {
         "bot_configured": settings.TELEGRAM_BOT_TOKEN is not None,
         "whitelist_user_id": settings.ALLOWED_TELEGRAM_USER_ID,
-        "telegram_api_response": bot_info
+        "telegram_api_response": bot_info,
+        "webhook_info": webhook_info
+    }
+
+@app.get("/api/v1/telegram/webhook-info")
+async def telegram_webhook_info(user_auth: dict = Depends(verify_access)):
+    """Affiche les détails du webhook Telegram et les messages en attente de livraison."""
+    return await get_webhook_info()
+
+@app.post("/api/v1/telegram/flush")
+async def telegram_flush_updates(user_auth: dict = Depends(verify_access)):
+    """Purge immédiatement tous les messages et retries en attente dans la file Telegram."""
+    logger.info("Purge manuelle de la file d'attente Telegram demandée...")
+    result = await flush_telegram_pending_updates()
+    return {
+        "status": "flushed",
+        "result": result
     }
 
 @app.post("/api/v1/telegram/test")

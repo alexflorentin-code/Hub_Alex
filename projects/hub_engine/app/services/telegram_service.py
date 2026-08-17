@@ -125,19 +125,37 @@ async def send_chat_action(chat_id: Optional[int] = None, action: str = "typing"
         logger.debug(f"Notification chat_action Telegram ignorée : {str(e)}")
         return False
 
-async def get_bot_info() -> dict:
-    """Vérifie la validité du Bot Token auprès des serveurs de Telegram."""
+async def get_webhook_info() -> dict:
+    """Récupère les informations sur l'état du webhook Telegram et les messages en attente (pending_update_count)."""
     if not settings.TELEGRAM_BOT_TOKEN:
         return {"status": "error", "message": "TELEGRAM_BOT_TOKEN non configuré."}
 
-    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/getMe"
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/getWebhookInfo"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url)
-            data = resp.json()
-            if resp.status_code == 200 and data.get("ok"):
-                return {"status": "success", "bot": data.get("result")}
-            return {"status": "error", "code": resp.status_code, "response": data}
+            return resp.json()
     except Exception as e:
         return {"status": "exception", "error": str(e)}
+
+async def flush_telegram_pending_updates() -> dict:
+    """Vide la file d'attente des messages en attente côté serveurs Telegram (drop_pending_updates)."""
+    if not settings.TELEGRAM_BOT_TOKEN:
+        return {"status": "error", "message": "TELEGRAM_BOT_TOKEN non configuré."}
+
+    # Récupérer l'URL actuelle du webhook pour ne pas la perdre
+    info = await get_webhook_info()
+    current_url = info.get("result", {}).get("url", "")
+
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/setWebhook"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            payload = {"drop_pending_updates": True}
+            if current_url:
+                payload["url"] = current_url
+            resp = await client.post(url, json=payload)
+            return resp.json()
+    except Exception as e:
+        return {"status": "exception", "error": str(e)}
+
 
