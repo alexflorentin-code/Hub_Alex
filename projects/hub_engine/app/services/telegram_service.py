@@ -158,4 +158,24 @@ async def flush_telegram_pending_updates() -> dict:
     except Exception as e:
         return {"status": "exception", "error": str(e)}
 
+async def get_bot_info() -> dict:
+    """Vérifie la validité du Bot Token auprès des serveurs de Telegram."""
+    if not settings.TELEGRAM_BOT_TOKEN:
+        return {"status": "error", "message": "TELEGRAM_BOT_TOKEN non configuré."}
+
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/getMe"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            data = resp.json()
+            if resp.status_code == 200 and data.get("ok"):
+                return {"status": "success", "bot": data.get("result")}
+            return {"status": "error", "code": resp.status_code, "response": data}
+    except Exception as e:
+        return {"status": "exception", "error": str(e)}
+
+
+
+
+
 
